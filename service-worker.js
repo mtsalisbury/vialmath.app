@@ -1,5 +1,5 @@
 // Bump CACHE_NAME any time you change index.html/icons to push an update to installed users.
-var CACHE_NAME = "vialmath-cache-v8";
+var CACHE_NAME = "vialmath-cache-v31";
 var CORE_FILES = [
   "./",
   "./index.html",

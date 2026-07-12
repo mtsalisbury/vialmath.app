@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>RXpep Calculator — Reconstitution &amp; Dose Tracking</title>
+<title>VialMath — RxPep Calculator</title>
 
 <!-- Installable app metadata -->
 <link rel="manifest" href="manifest.json" />
@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="RXpep Calculator" />
+<meta name="apple-mobile-web-app-title" content="VialMath" />
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -65,6 +65,12 @@
     cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
   }
   .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  @media (max-width: 480px) {
+    .tab { padding: 8px 10px; font-size: 12.5px; }
+    .app-header { padding: 16px 14px 0; }
+    .content { padding: 14px; }
+    .card { padding: 16px; }
+  }
 
   .content { padding: 20px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
@@ -84,7 +90,7 @@
     border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); width: 100%;
   }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
-  .input-row { display: flex; gap: 8px; }
+  .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .input-row input { flex: 1; min-width: 0; }
   .input-row select { width: auto; flex-shrink: 0; }
   .unit-suffix { display: flex; align-items: center; padding: 0 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); }
@@ -95,6 +101,7 @@
   .result-value { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .result-sub { font-size: 13px; color: var(--muted); font-weight: 400; }
   .syringe-wrap { margin-top: 14px; }
+  .syringe-wrap svg { max-width: 100%; height: auto; }
   .warn-text { margin-top: 12px; background: var(--warn-light); color: var(--warn); border-radius: 6px; padding: 10px 12px; font-size: 12.5px; line-height: 1.5; }
 
   .notice { background: #F0F0EC; border-radius: 6px; padding: 12px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
@@ -110,8 +117,19 @@
   .summary-value { font-family: 'IBM Plex Mono', monospace; font-size: 16px; margin-top: 2px; }
 
   .log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-  .log-item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fff; }
+  .log-item { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; }
+  .log-compact-meta { font-size: 13px; color: var(--ink); margin-bottom: 2px; }
+  .log-compact-note { font-size: 12.5px; color: var(--muted); font-style: italic; margin-bottom: 6px; }
+  .log-compact-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .quick-add-row { gap: 6px; margin-bottom: 6px; }
+  .quick-add-input { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; }
   .log-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .log-row-header { font-size: 13px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+  .missing-name-flag { color: var(--warn); font-size: 12.5px; font-weight: 600; }
+  .inline-name-fix { display: inline-block; width: auto; min-width: 160px; padding: 4px 8px; font-size: 12.5px; border-color: var(--warn); }
+  .stack-sibling-line { font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 8px; }
+  .dose-number-line { font-size: 12px; color: var(--primary); font-weight: 600; margin-bottom: 6px; }
+  .view-vial-link { font-size: 11px; padding: 2px 6px; vertical-align: middle; }
   .log-row:last-child { margin-bottom: 0; }
   .log-row input[type="date"] { max-width: 150px; }
   .log-dose { font-size: 13px; flex: 1; font-family: 'IBM Plex Mono', monospace; }
@@ -122,6 +140,34 @@
   .contact-reminder { margin-top: 18px; border: 1px solid var(--warn); color: var(--warn); border-radius: 8px; padding: 12px 14px; font-size: 12.5px; line-height: 1.5; }
 
   .danger-zone { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+  /* ---- start wizard ---- */
+  .wizard-progress { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 16px; }
+  .wizard-step { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .wizard-step.active { color: var(--primary); font-weight: 600; }
+  .wizard-step.done { color: var(--ink); }
+  .wizard-sep { color: var(--line); font-size: 12px; }
+  .wizard-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .label-prompt { background: var(--primary-light); border: 1px solid var(--primary); border-radius: 8px; padding: 14px; margin-top: 16px; }
+  .label-prompt .wizard-actions { margin-top: 10px; }
+  .wizard-actions .primary-btn { order: 1; }
+  .wizard-actions .text-btn { order: 2; align-self: center; }
+
+  .start-options { display: flex; flex-direction: column; gap: 10px; }
+  .start-option-card {
+    display: flex; align-items: center; gap: 14px; width: 100%;
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; cursor: pointer; text-align: left;
+    font-family: 'Inter', sans-serif; transition: border-color 0.15s, background 0.15s;
+  }
+  .start-option-card:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-light); }
+  .start-option-card:disabled { opacity: 0.45; cursor: not-allowed; }
+  .start-option-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+  .start-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .start-option-title { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .start-option-sub { font-size: 12.5px; color: var(--muted); }
+  .reorder-flag { background: var(--warn-light); color: var(--warn); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .inventory-match-notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .reset-confirm { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
 
   /* ---- inventory tab ---- */
@@ -132,10 +178,36 @@
   .secondary-btn { background: var(--ink); }
 
   .vial-group { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+
+  /* ---- collapsible function sections (Log a purchase / Stack an injection) ---- */
+  .collapsible-fn { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; padding: 4px 12px; background: #fff; }
+  .collapsible-fn-toggle {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; color: var(--ink);
+    padding: 10px 0; cursor: pointer;
+  }
+  .collapsible-fn .subcard { border: none; padding: 0; margin: 0 0 12px; }
+  .collapsible-fn .recon-form { border-top: none; padding-top: 0; margin-top: 0; }
+
+  /* ---- dose groups (vial header + list of dose lines) ---- */
+  .dose-group { margin-bottom: 14px; }
+  .dose-group-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .dose-line-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .dose-line { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; }
+  .dose-line-syringe { flex-shrink: 0; width: 76px; }
+  .dose-line-syringe svg { width: 76px; height: auto; }
+  .dose-line-body { flex: 1; min-width: 0; }
+  .dose-line-editing { display: block; padding: 10px; }
+  .toggle-vial-doses-btn { margin-top: 4px; }
   .vial-group-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
   .recon-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
 
   .vial-card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 12px; background: var(--primary-light); }
+  .vial-card-expired { border-color: var(--warn); background: var(--warn-light); }
+  .stack-row { border-bottom: 1px dashed var(--line); padding: 10px 0; }
+  .stack-row:last-of-type { border-bottom: none; }
+  .stack-check-label { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px; }
+  .stack-row .input-row { max-width: 320px; }
   .vial-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
   .vial-id { font-size: 12px; color: var(--muted); margin-right: 6px; }
   .vial-card-row { font-size: 12.5px; margin-bottom: 3px; }
@@ -145,12 +217,13 @@
   .usage-dot.done { color: var(--primary); }
   .vial-card-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 
-  .history-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  .history-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .history-table { width: 100%; min-width: 420px; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
   .history-table th, .history-table td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; }
   .history-table th { background: #fff; font-weight: 600; font-size: 11.5px; color: var(--muted); }
 
   .label-preview-frame { display: flex; justify-content: center; padding: 20px; background: #E4E9E6; border-radius: 8px; margin: 8px 0 16px; }
-  .label-card { width: 260px; background: #fff; border: 1px solid var(--ink); border-radius: 3px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .label-card { width: 260px; max-width: 100%; background: #fff; border: 1px solid var(--ink); border-radius: 3px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
   .label-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; color: var(--ink); }
   .label-row { font-size: 10.5px; color: var(--ink); line-height: 1.4; }
   .label-row.mono { font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
@@ -211,12 +284,13 @@
 
   var DEFAULT_STATE = {
     vial: { compoundName: "", totalAmount: "", totalUnit: "mg", diluentVolume: "" },
-    dose: { amount: "", unit: "mcg", syringeId: "u100" },
+    dose: { amount: "", unit: "mcg", syringeId: "u100", linkedVialId: "" },
     meta: { reconstitutedDate: "", discardDate: "", prescriberNotes: "" },
     log: [],
     label: { size: "small", copies: 6 },
     inventory: { purchases: [], vials: [], counters: {} },
-    saved: []
+    saved: [],
+    stacks: []
   };
 
   // ---------- helpers ----------
@@ -240,6 +314,19 @@
     return r.toString();
   }
   function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function addDaysToDateStr(dateStr, days) {
+    var d = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+  function weekNumberSince(startDateStr, targetDateStr) {
+    if (!startDateStr || !targetDateStr) return null;
+    var start = new Date(startDateStr + "T00:00:00");
+    var target = new Date(targetDateStr + "T00:00:00");
+    var diffDays = Math.round((target - start) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0 || isNaN(diffDays)) return null;
+    return Math.floor(diffDays / 7) + 1;
+  }
   function uid() { return Math.random().toString(36).slice(2, 10); }
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -285,6 +372,9 @@
     var diluentML = parseFloat(vial.diluentML) || 0;
     return diluentML > 0 ? totalMcg / diluentML : 0;
   }
+  function isVialExpired(v) {
+    return v.status === "active" && !!v.expiryDate && v.expiryDate < todayISO();
+  }
   function inventorySummary(inv) {
     var totalPurchasedMg = inv.purchases.reduce(function (s, p) { return s + (p.totalMg || 0); }, 0);
     var unopened = inv.vials.filter(function (v) { return v.status === "unopened"; });
@@ -292,15 +382,53 @@
     var finished = inv.vials.filter(function (v) { return v.status === "finished"; });
     var finishedMg = finished.reduce(function (s, v) { return s + (v.strengthMg || 0); }, 0);
     var remainingMg = Math.max(0, totalPurchasedMg - finishedMg);
+    var rawMg = unopened.reduce(function (s, v) { return s + (v.strengthMg || 0); }, 0);
+    var reconstitutedMg = active.reduce(function (s, v) { return s + (v.strengthMg || 0); }, 0);
 
-    // group unopened vials by peptide name for the "reconstitute" actions
+    // group unopened vials by purchase batch (not just peptide name) so distinct lots/suppliers/
+    // sizes of the same peptide show up as separate, selectable options rather than being merged
     var groups = {};
     unopened.forEach(function (v) {
-      var key = v.peptideName;
-      if (!groups[key]) groups[key] = { peptideName: key, strengthMg: v.strengthMg, count: 0, vialIds: [] };
+      var key = v.purchaseId || v.peptideName; // fall back gracefully if a vial somehow lacks a purchaseId
+      if (!groups[key]) {
+        var purchase = inv.purchases.filter(function (p) { return p.id === v.purchaseId; })[0];
+        groups[key] = {
+          purchaseId: v.purchaseId || null,
+          peptideName: v.peptideName, strengthMg: v.strengthMg, vialSizeML: v.vialSizeML,
+          supplier: purchase ? purchase.supplier : "", lotNumber: purchase ? purchase.lotNumber : "",
+          date: purchase ? purchase.date : "",
+          labelPrinted: purchase ? !!purchase.labelPrinted : false,
+          labelPrintedDate: purchase ? purchase.labelPrintedDate : "",
+          count: 0, vialIds: []
+        };
+      }
       groups[key].count++;
       groups[key].vialIds.push(v.id);
     });
+
+    // per-peptide breakdown: raw vs reconstituted mg, last reconstituted date, low-stock flag
+    var LOW_STOCK_THRESHOLD = 1;
+    var peptideNames = {};
+    inv.vials.forEach(function (v) { peptideNames[v.peptideName] = true; });
+    var byPeptide = Object.keys(peptideNames).map(function (name) {
+      var vs = inv.vials.filter(function (v) { return v.peptideName === name; });
+      var unopenedVs = vs.filter(function (v) { return v.status === "unopened"; });
+      var activeVs = vs.filter(function (v) { return v.status === "active"; });
+      var finishedVs = vs.filter(function (v) { return v.status === "finished"; });
+      var lastReconDate = vs.reduce(function (latest, v) {
+        return (v.reconstitutedDate && (!latest || v.reconstitutedDate > latest)) ? v.reconstitutedDate : latest;
+      }, null);
+      return {
+        peptideName: name,
+        unopenedCount: unopenedVs.length,
+        activeCount: activeVs.length,
+        finishedCount: finishedVs.length,
+        rawMg: unopenedVs.reduce(function (s, v) { return s + (v.strengthMg || 0); }, 0),
+        reconstitutedMg: activeVs.reduce(function (s, v) { return s + (v.strengthMg || 0); }, 0),
+        lastReconstitutedDate: lastReconDate,
+        lowStock: unopenedVs.length <= LOW_STOCK_THRESHOLD
+      };
+    }).sort(function (a, b) { return a.peptideName.localeCompare(b.peptideName); });
 
     return {
       totalPurchasedMg: totalPurchasedMg,
@@ -308,17 +436,88 @@
       activeCount: active.length,
       finishedCount: finished.length,
       remainingMg: remainingMg,
+      rawMg: rawMg,
+      reconstitutedMg: reconstitutedMg,
       unopenedGroups: Object.keys(groups).map(function (k) { return groups[k]; }),
       activeVials: active,
-      finishedVials: finished
+      finishedVials: finished,
+      byPeptide: byPeptide
     };
+  }
+
+  // ---------- inventory match: suggest existing unopened stock while entering a vial elsewhere ----------
+  function findInventoryMatch(name) {
+    var n = (name || "").trim().toLowerCase();
+    if (!n) return null;
+    var groups = inventorySummary(state.inventory).unopenedGroups;
+    return groups.filter(function (g) { return g.peptideName.trim().toLowerCase() === n; })[0] || null;
+  }
+  function inventoryMatchHTML(name) {
+    var m = findInventoryMatch(name);
+    if (!m) return "";
+    return '<div class="notice inventory-match-notice">You have ' + m.count + ' unopened ' + esc(m.peptideName) +
+      ' vial' + (m.count === 1 ? "" : "s") + ' at ' + fmt(m.strengthMg, 2) + ' mg each in Inventory. ' +
+      '<button type="button" class="text-btn" id="use-inventory-match-btn">Use this</button></div>';
+  }
+  // finds a currently-active inventory vial with a matching peptide name, so a dose logged
+  // from the quick calculator can be tied to a real vial ID instead of floating free
+  function findActiveVialMatch(name) {
+    var n = (name || "").trim().toLowerCase();
+    if (!n) return null;
+    return state.inventory.vials.filter(function (v) { return v.status === "active" && v.peptideName.trim().toLowerCase() === n; })[0] || null;
+  }
+
+  // Logs the current Vial&Mix/Dose entry. Uses whatever vial the user explicitly chose in the
+  // "Link to vial" dropdown (state.dose.linkedVialId). If nothing was chosen (or the chosen vial
+  // is no longer active), it logs as a standalone ad-hoc entry instead, tagged with whatever
+  // peptide name was typed so it's still identifiable.
+  function logCurrentDose(d) {
+    var linkedVial = null;
+    if (state.dose.linkedVialId) {
+      linkedVial = state.inventory.vials.filter(function (v) { return v.id === state.dose.linkedVialId && v.status === "active"; })[0] || null;
+    }
+    if (linkedVial) {
+      linkedVial.injections = linkedVial.injections || [];
+      linkedVial.injections.push({
+        id: uid(),
+        date: todayISO(),
+        doseAmount: state.dose.amount,
+        doseUnit: state.dose.unit,
+        site: "",
+        note: ""
+      });
+    } else {
+      state.log.unshift({
+        id: uid(),
+        date: todayISO(),
+        doseMcg: d.doseMcg,
+        doseLabel: state.dose.amount + " " + state.dose.unit,
+        volumeML: d.drawVolumeML,
+        site: "",
+        note: "",
+        peptideName: state.vial.compoundName || ""
+      });
+    }
+    saveStateDebounced();
   }
 
   // ---------- state ----------
   var state = loadState();
-  var currentTab = "vial";
+  var currentTab = "start";
+  var wizardStep = 1; // UI-only, not persisted: 1=start options, 2=which vial, 3=add a dose, 4=done
+  var dosingVialId = null; // which vial the Add-a-dose flow is currently logging against (UI-only, not persisted)
+  var wizardFlow = null; // "reconstitute" | "dose" | null \u2014 which guided flow steps 2-4 belong to (UI-only, not persisted)
   var saveTimer = null;
   var reconstitutingPeptide = null; // which unopened-vial group has its reconstitute form open (UI-only, not persisted)
+  var reconstitutingPurchaseId = null; // which specific purchase batch of that peptide was chosen (UI-only, not persisted)
+  var editingVialId = null; // which active vial's edit form is open (UI-only, not persisted)
+  var addingAdhocDose = false; // whether the Tracker's manual "ad-hoc dose" form is open (UI-only, not persisted)
+  var editingLogEntryKey = null; // which tracker row (source:refId) is expanded for full editing (UI-only, not persisted)
+  var quickAddTarget = null; // { entryKey, field } — which single field's inline "+" input is open (UI-only, not persisted)
+  var expandedVialDosesId = null; // which vial's dose history is expanded on the Inventory page (UI-only, not persisted)
+  var purchaseFormOpen = false; // Inventory: is the "Log a purchase" section expanded (UI-only, not persisted)
+  var stackSectionOpen = false; // Inventory: is the "Stack an injection" section expanded (UI-only, not persisted)
+  var labelSelection = "adhoc"; // Print label tab: "adhoc" | "vial:<id>" | "batch:<purchaseId>" (UI-only, not persisted)
 
   function loadState() {
     try {
@@ -336,7 +535,8 @@
           vials: (parsed.inventory && Array.isArray(parsed.inventory.vials)) ? parsed.inventory.vials : [],
           counters: (parsed.inventory && parsed.inventory.counters) ? parsed.inventory.counters : {}
         },
-        saved: Array.isArray(parsed.saved) ? parsed.saved : []
+        saved: Array.isArray(parsed.saved) ? parsed.saved : [],
+        stacks: Array.isArray(parsed.stacks) ? parsed.stacks : []
       };
     } catch (e) {
       return JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -353,6 +553,18 @@
         console.error("Could not save:", e);
       }
     }, 300);
+  }
+
+  function saveNow() {
+    clearTimeout(saveTimer);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      flashSaved();
+      return true;
+    } catch (e) {
+      console.error("Could not save:", e);
+      return false;
+    }
   }
 
   function flashSaved() {
@@ -441,6 +653,244 @@
   }
 
   // ---------- tab renderers ----------
+  // ---------- start wizard (guided flow: welcome -> vial & dose -> preview label -> print & log) ----------
+  function renderStartTab(d) {
+    // guard against stale/invalid state (e.g. reload mid-flow)
+    if (wizardFlow === "dose") {
+      if (wizardStep === 2 && inventorySummary(state.inventory).activeVials.length === 0) wizardStep = 1;
+      if ((wizardStep === 3 || wizardStep === 4) && !state.inventory.vials.some(function (v) { return v.id === dosingVialId; })) wizardStep = 1;
+    }
+    if (wizardFlow === "reconstitute") {
+      var stillAvailable = inventorySummary(state.inventory).unopenedGroups.some(function (g) { return !findActiveVialMatch(g.peptideName); });
+      if (wizardStep >= 2 && wizardStep <= 3 && !stillAvailable) wizardStep = 1;
+    }
+    if (wizardStep === 1) { wizardFlow = null; return renderWizardStep1(); }
+
+    if (wizardFlow === "reconstitute") {
+      if (wizardStep === 2) return renderWizardReconPicker();
+      if (wizardStep === 3) return renderWizardReconForm();
+      if (wizardStep === 4) return renderWizardReconDone();
+    }
+    if (wizardFlow === "dose") {
+      if (wizardStep === 2) return renderWizardVialPicker();
+      if (wizardStep === 3) return renderWizardAddDose();
+      if (wizardStep === 4) return renderWizardDoseDone();
+    }
+    if (wizardFlow === "purchase") {
+      if (wizardStep === 2) return renderWizardPurchaseForm();
+      if (wizardStep === 3) return renderWizardPurchaseDone();
+    }
+    return renderWizardStep1();
+  }
+
+  function wizardProgressHTML(step) {
+    var labels = wizardFlow === "reconstitute" ? ["Start", "Which batch", "Reconstitute", "Done"]
+      : wizardFlow === "purchase" ? ["Start", "Purchase", "Done"]
+      : ["Start", "Which vial", "Add a dose", "Done"];
+    return '<div class="wizard-progress">' + labels.map(function (l, i) {
+      var n = i + 1;
+      var cls = n === step ? "active" : (n < step ? "done" : "");
+      return '<span class="wizard-step ' + cls + '">' + n + '. ' + esc(l) + '</span>';
+    }).join('<span class="wizard-sep">\u203a</span>') + '</div>';
+  }
+
+  function startOptionButton(id, icon, title, sub, disabled) {
+    return '<button type="button" class="start-option-card" id="' + id + '"' + (disabled ? " disabled" : "") + '>' +
+      '<span class="start-option-icon" aria-hidden="true">' + icon + '</span>' +
+      '<span class="start-option-text"><span class="start-option-title">' + esc(title) + '</span>' +
+      '<span class="start-option-sub">' + esc(sub) + '</span></span>' +
+      '</button>';
+  }
+
+  function renderWizardStep1() {
+    var inv = inventorySummary(state.inventory);
+    var hasUnopened = inv.unopenedGroups.some(function (g) { return !findActiveVialMatch(g.peptideName); });
+    var hasActive = inv.activeVials.length > 0;
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(1) +
+      '<h2>What would you like to do?</h2>' +
+      '<div class="start-options">' +
+      startOptionButton("start-reconstitute-btn", "\uD83E\uDDEA", "Reconstitute a vial",
+        hasUnopened ? "Turn an unopened vial into an active one" : "No unopened vials ready \u2014 log a purchase first") +
+      startOptionButton("start-add-dose-btn", "\uD83D\uDC89", "Add a dose",
+        hasActive ? "Log a dose against a vial that's already active" : "No active vials yet \u2014 reconstitute one first", !hasActive) +
+      startOptionButton("start-purchase-btn", "\uD83D\uDCE6", "Log a purchase", "Record a new order into inventory") +
+      startOptionButton("start-view-inventory-btn", "\uD83D\uDCCB", "View inventory", "See what's on hand and what's active") +
+      '</div>' +
+      '</section>';
+  }
+
+  function renderWizardReconPicker() {
+    var groups = inventorySummary(state.inventory).unopenedGroups.filter(function (g) { return !findActiveVialMatch(g.peptideName); });
+    var optionsHTML = groups.map(function (g, i) {
+      var subBits = [g.count + ' unopened', fmt(g.strengthMg, 2) + ' mg each'];
+      if (g.vialSizeML) subBits.push(g.vialSizeML + ' mL vial');
+      if (g.supplier) subBits.push(g.supplier);
+      if (g.lotNumber) subBits.push('lot ' + g.lotNumber);
+      var label = g.peptideName + ' \u2014 ' + subBits.join(', ');
+      return '<option value="' + i + '">' + esc(label) + '</option>';
+    }).join("");
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(2) +
+      '<h2>Which batch?</h2>' +
+      '<p class="card-desc">' + (groups.length > 1 ? "Select which batch to open." : "Confirm the batch to open.") + '</p>' +
+      field("Batch", null, '<select id="recon-batch-select">' + optionsHTML + '</select>') +
+      '<div class="wizard-actions">' +
+      '<button class="text-btn subtle" id="wizard-back-to-start-btn">Back</button>' +
+      '<button class="primary-btn" id="recon-picker-continue-btn">Continue</button>' +
+      '</div>' +
+      '</section>';
+  }
+
+  function renderWizardReconForm() {
+    var groups = inventorySummary(state.inventory).unopenedGroups;
+    var g = groups.filter(function (grp) {
+      return grp.peptideName === reconstitutingPeptide && (reconstitutingPurchaseId ? grp.purchaseId === reconstitutingPurchaseId : true);
+    })[0];
+    if (!g) return renderWizardStep1();
+    var subBits = [g.count + ' unopened', fmt(g.strengthMg, 2) + ' mg each'];
+    if (g.vialSizeML) subBits.push(esc(g.vialSizeML) + ' mL vial');
+    if (g.supplier) subBits.push(esc(g.supplier));
+    if (g.lotNumber) subBits.push('lot ' + esc(g.lotNumber));
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(3) +
+      '<h2>Reconstitute ' + esc(g.peptideName) + '</h2>' +
+      '<p class="card-desc">' + subBits.join(' \u00b7 ') + '. This opens the next vial from this batch and makes it active.</p>' +
+      reconstituteFormHTML(g) +
+      '<div class="wizard-actions"><button class="text-btn subtle" id="wizard-back-to-recon-picker-btn">Back</button></div>' +
+      '</section>';
+  }
+
+  function renderWizardReconDone() {
+    var vial = state.inventory.vials.filter(function (v) { return v.id === dosingVialId; })[0];
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(4) +
+      '<h2>Done</h2>' +
+      '<p class="card-desc">' + (vial ? esc(vial.peptideName) + ' <span class="mono vial-id">' + esc(vial.id) + '</span>' : "The vial") + ' is now active and ready to dose.</p>' +
+      '<div class="label-prompt" id="recon-label-prompt">' +
+      '<p class="card-desc small">Print a label for this vial now?</p>' +
+      '<div class="wizard-actions">' +
+      '<button class="primary-btn" id="wizard-print-vial-label-btn">Yes, print label</button>' +
+      '<button class="text-btn subtle" id="wizard-skip-vial-label-btn">Not now</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="wizard-actions">' +
+      '<button class="text-btn subtle" id="wizard-goto-inventory-btn">View in Inventory</button>' +
+      '<button class="primary-btn" id="wizard-add-dose-now-btn">Add a dose now</button>' +
+      '</div>' +
+      '</section>';
+  }
+
+  function renderWizardPurchaseForm() {
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(2) +
+      '<h2>Log a purchase</h2>' +
+      '<p class="card-desc">Record what you ordered. This adds that many unopened vials to inventory, each with its own ID.</p>' +
+      purchaseFormHTML(true) +
+      '<div class="wizard-actions"><button class="text-btn subtle" id="wizard-back-to-start-btn">Back</button></div>' +
+      '</section>';
+  }
+
+  function renderWizardPurchaseDone() {
+    var purchases = state.inventory.purchases;
+    var last = purchases[purchases.length - 1];
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(3) +
+      '<h2>Purchase logged</h2>' +
+      '<p class="card-desc">' +
+      (last ? esc(last.vialsPurchased) + ' \u00d7 ' + esc(last.peptideName) + ' vial' + (last.vialsPurchased === 1 ? "" : "s") + ' added to inventory, unopened.' : "Added to inventory.") +
+      '</p>' +
+      (last ? '' +
+        '<div class="label-prompt" id="purchase-label-prompt">' +
+        '<p class="card-desc small">Print labels for this batch now (' + last.vialsPurchased + ', one per vial) so each one can be matched back to its vendor and lot in storage?</p>' +
+        '<div class="wizard-actions">' +
+        '<button class="primary-btn" id="wizard-print-batch-label-btn">Yes, print labels</button>' +
+        '<button class="text-btn subtle" id="wizard-skip-batch-label-btn">Not now</button>' +
+        '</div>' +
+        '</div>'
+        : "") +
+      '<div class="wizard-actions">' +
+      '<button class="text-btn subtle" id="wizard-goto-inventory-btn">View in Inventory</button>' +
+      '<button class="primary-btn" id="wizard-log-another-purchase-btn">Log another purchase</button>' +
+      '</div>' +
+      '</section>';
+  }
+
+  function renderWizardVialPicker() {
+    var actives = inventorySummary(state.inventory).activeVials;
+    var optionsHTML = actives.map(function (v, i) {
+      var conc = vialConcentration(v);
+      var label = v.peptideName + ' (' + v.id + ') \u2014 ' + fmt(conc / 1000, 4) + ' mg/mL' + (isVialExpired(v) ? ' \u2014 expired' : '');
+      return '<option value="' + i + '">' + esc(label) + '</option>';
+    }).join("");
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(2) +
+      '<h2>Which vial?</h2>' +
+      '<p class="card-desc">' + (actives.length > 1 ? "Select which active vial to dose from." : "Confirm the vial to dose from.") + '</p>' +
+      field("Vial", null, '<select id="dose-vial-select">' + optionsHTML + '</select>') +
+      '<div class="wizard-actions">' +
+      '<button class="text-btn subtle" id="wizard-back-to-start-btn">Back</button>' +
+      '<button class="primary-btn" id="vial-picker-continue-btn">Continue</button>' +
+      '</div>' +
+      '</section>';
+  }
+
+  function renderWizardAddDose() {
+    var vial = state.inventory.vials.filter(function (v) { return v.id === dosingVialId; })[0];
+    var conc = vialConcentration(vial);
+    var amount = parseFloat(state.dose.amount) || 0;
+    var conv = doseToVolume(amount, state.dose.unit, conc);
+    var hasAmount = amount > 0;
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(3) +
+      '<h2>Add a dose</h2>' +
+      '<div class="vial-card">' +
+      '<div class="vial-card-head"><span class="mono vial-id">' + esc(vial.id) + '</span> <strong>' + esc(vial.peptideName) + '</strong>' +
+      (isVialExpired(vial) ? ' <span class="reorder-flag expired-flag">Expired</span>' : '') + '</div>' +
+      '<div class="vial-card-row mono">Concentration: ' + fmt(conc / 1000, 4) + ' mg/mL</div>' +
+      '</div>' +
+      '<div class="grid-2">' +
+      field("Dose amount", null,
+        '<div class="input-row"><input type="number" min="0" inputmode="decimal" data-path="dose.amount" value="' + esc(state.dose.amount) + '" placeholder="e.g. 250" />' +
+        '<select data-path="dose.unit">' + opt("mcg", state.dose.unit) + opt("mg", state.dose.unit) + opt("units", state.dose.unit, "units (syringe)") + '</select></div>') +
+      '<div></div>' +
+      '</div>' +
+      '<div class="result-panel ' + (hasAmount ? "" : "muted") + '" id="wizard-dose-result-panel">' + renderWizardDoseResult(conv, hasAmount) + '</div>' +
+      '<div class="wizard-actions">' +
+      '<button class="text-btn subtle" id="wizard-back-to-picker-btn">Back</button>' +
+      '<button class="primary-btn" id="wizard-add-dose-confirm-btn" ' + (hasAmount ? "" : "disabled") + '>Print label &amp; log dose</button>' +
+      '</div>' +
+      '</section>';
+  }
+
+  function renderWizardDoseResult(conv, hasAmount) {
+    if (!hasAmount) return '<div class="result-label">Draw to</div><div class="result-value">—</div>';
+    return '<div class="result-label">Draw to</div><div class="result-value mono">' + fmt(conv.volumeML, 3) + ' mL<span class="result-sub">(' + fmt(conv.volumeML * 100, 1) + ' units)</span></div>';
+  }
+
+  function renderWizardDoseDone() {
+    var vial = state.inventory.vials.filter(function (v) { return v.id === dosingVialId; })[0];
+    return '' +
+      '<section class="card">' +
+      wizardProgressHTML(4) +
+      '<h2>Done</h2>' +
+      '<p class="card-desc">Label sent to print, and this dose is logged against ' +
+      (vial ? esc(vial.peptideName) + ' <span class="mono vial-id">' + esc(vial.id) + '</span>' : "the vial") + '.</p>' +
+      '<div class="wizard-actions">' +
+      '<button class="text-btn subtle" id="wizard-view-tracker-btn">View tracker</button>' +
+      '<button class="primary-btn" id="wizard-add-another-dose-btn">Add another dose</button>' +
+      '</div>' +
+      '</section>';
+  }
+
   function renderVialTab(d) {
     var v = state.vial, m = state.meta;
     return '' +
@@ -449,6 +899,7 @@
       '<p class="card-desc">Enter what\'s printed on the vial and how much diluent you\'re adding, exactly as your pharmacist instructed.</p>' +
       field("Compound / vial name", 'as written on the vial or pharmacy label',
         '<input type="text" data-path="vial.compoundName" value="' + esc(v.compoundName) + '" placeholder="e.g. Semaglutide" />') +
+      '<div id="vial-inventory-match">' + inventoryMatchHTML(v.compoundName) + '</div>' +
       '<div class="grid-2">' +
       field("Total amount in vial", null,
         '<div class="input-row">' +
@@ -484,11 +935,22 @@
 
   function renderDoseTab(d) {
     var ds = state.dose;
+    // if nothing has been explicitly chosen yet, default to an active vial matching the typed
+    // compound name (still fully overridable via the dropdown below \u2014 this is just a starting point)
+    if (!ds.linkedVialId) {
+      var suggested = findActiveVialMatch(state.vial.compoundName);
+      if (suggested) ds.linkedVialId = suggested.id;
+    }
+    var activeVials = inventorySummary(state.inventory).activeVials;
+    var linkOptions = '<option value="">Not linked \u2014 ad-hoc entry</option>' +
+      activeVials.map(function (v) { return opt(v.id, ds.linkedVialId, v.peptideName + ' (' + v.id + ')'); }).join("");
     return '' +
       '<section class="card">' +
       '<h2>Prescribed dose</h2>' +
       '<p class="card-desc">Enter the exact dose your prescriber gave you. This calculates how much liquid that dose corresponds to — it does not choose or suggest a dose.</p>' +
       (!d.hasVial ? '<div class="notice">Set up your vial concentration on the "Vial &amp; mix" tab first.</div>' : "") +
+      field("Select vial", activeVials.length === 0 ? "No active vials \u2014 this will log as ad-hoc" : "Which inventory vial this dose comes from, or leave ad-hoc",
+        '<select data-path="dose.linkedVialId">' + linkOptions + '</select>') +
       '<div class="grid-2">' +
       field("Prescribed dose amount", null,
         '<div class="input-row">' +
@@ -536,37 +998,220 @@
     return html;
   }
 
-  function renderLogTab(d) {
-    var items = state.log.map(function (e) {
+  // merges standalone tracker entries with every inventory vial's injection history,
+  // newest first, so the Tracker tab shows one list with peptide name + vial ID together
+  function getAllTrackerEntries() {
+    var entries = [];
+    state.log.forEach(function (e) {
+      entries.push({
+        source: "log", refId: e.id, vialRefId: null,
+        date: e.date, peptideName: e.peptideName || "", vialId: null,
+        doseLabel: e.doseLabel || "", volumeML: e.volumeML, site: e.site || "", note: e.note || ""
+      });
+    });
+    state.inventory.vials.forEach(function (v) {
+      (v.injections || []).forEach(function (inj, idx) {
+        var doseLabel = inj.doseAmount ? (inj.doseAmount + " " + (inj.doseUnit || "mcg")) : "";
+        var stackPeptides = [];
+        if (inj.stackId) {
+          var stack = state.stacks.filter(function (s) { return s.id === inj.stackId; })[0];
+          if (stack) {
+            stackPeptides = stack.components
+              .filter(function (c) { return c.vialId !== v.id; })
+              .map(function (c) { return c.peptideName + " (" + fmt(c.volumeML, 3) + " mL)"; });
+          }
+        }
+        entries.push({
+          source: "vial", refId: inj.id, vialRefId: v.id,
+          date: inj.date, peptideName: v.peptideName, vialId: v.id,
+          doseLabel: doseLabel, volumeML: null, site: inj.site || "", note: inj.note || "",
+          stackPeptides: stackPeptides,
+          doseNumber: idx + 1, plannedDoses: v.plannedDoses || null
+        });
+      });
+    });
+    entries.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    return entries;
+  }
+
+  // ---------- shared: one dose line within a vial's history (used by Dose Tracker and Inventory's "Show doses") ----------
+  function doseLineHTML(vial, inj, idx, conc) {
+    var entryKey = "vial:" + inj.id;
+    var isEditing = editingLogEntryKey === entryKey;
+    var conv = doseToVolume(parseFloat(inj.doseAmount) || 0, inj.doseUnit || "mcg", conc);
+    var refSyringe = SYRINGES.filter(function (s) { return s.id === "u100"; })[0] || SYRINGES[2];
+    var fillFraction = refSyringe.capML > 0 ? conv.volumeML / refSyringe.capML : 0;
+    var week = weekNumberSince(vial.reconstitutedDate, inj.date);
+    var doseText = inj.doseAmount ? (esc(inj.doseAmount) + " " + esc(inj.doseUnit || "mcg")) : '<span class="field-hint">No dose recorded</span>';
+    var idAttrs = 'data-source="vial" data-ref-id="' + esc(inj.id) + '" data-vial-ref-id="' + esc(vial.id) + '"';
+
+    if (!isEditing) {
+      var showSiteInput = quickAddTarget && quickAddTarget.entryKey === entryKey && quickAddTarget.field === "site";
+      var showNoteInput = quickAddTarget && quickAddTarget.entryKey === entryKey && quickAddTarget.field === "note";
+      var metaBits = ["Dose " + (idx + 1), esc(inj.date), doseText];
+      if (week) metaBits.push("Week " + week);
+      if (inj.site && !showSiteInput) metaBits.push(esc(inj.site));
+      var siteInputRow = showSiteInput
+        ? '<div class="log-row quick-add-row"><input type="text" class="quick-add-input" data-entry-key="' + entryKey + '" data-field="site" placeholder="Injection site" value="' + esc(inj.site) + '" autofocus /><button type="button" class="text-btn save-quickadd-btn" data-entry-key="' + entryKey + '" data-field="site">Save</button></div>'
+        : "";
+      var noteInputRow = showNoteInput
+        ? '<div class="log-row quick-add-row"><input type="text" class="quick-add-input" data-entry-key="' + entryKey + '" data-field="note" placeholder="Note" value="' + esc(inj.note) + '" autofocus /><button type="button" class="text-btn save-quickadd-btn" data-entry-key="' + entryKey + '" data-field="note">Save</button></div>'
+        : "";
+      var noteDisplay = (inj.note && !showNoteInput) ? '<div class="log-compact-note">' + esc(inj.note) + '</div>' : "";
+      var siteAddBtn = (!inj.site && !showSiteInput) ? '<button type="button" class="text-btn subtle quick-add-btn" data-entry-key="' + entryKey + '" data-field="site">+ Location</button>' : "";
+      var noteAddBtn = (!inj.note && !showNoteInput) ? '<button type="button" class="text-btn subtle quick-add-btn" data-entry-key="' + entryKey + '" data-field="note">+ Note</button>' : "";
+
       return '' +
-        '<li class="log-item" data-log-id="' + e.id + '">' +
+        '<li class="dose-line" ' + idAttrs + '>' +
+        '<div class="dose-line-syringe">' + syringeSVG(fillFraction, fillFraction > 1) + '</div>' +
+        '<div class="dose-line-body">' +
+        '<div class="log-compact-meta">' + metaBits.join(' \u00b7 ') + '</div>' +
+        siteInputRow + noteDisplay + noteInputRow +
+        '<div class="log-compact-actions">' + siteAddBtn + noteAddBtn +
+        '<button type="button" class="text-btn subtle edit-log-entry-btn" data-entry-key="' + entryKey + '">Edit</button>' +
+        '</div>' +
+        '</div>' +
+        '</li>';
+    }
+
+    return '' +
+      '<li class="dose-line dose-line-editing" ' + idAttrs + '>' +
+      '<div class="log-row">' +
+      '<input type="date" data-log-field="date" value="' + esc(inj.date) + '" />' +
+      '<span class="log-dose">' + doseText + '</span>' +
+      '<button class="text-btn remove-log-btn">Remove</button>' +
+      '</div>' +
+      '<div class="log-row"><input type="text" data-log-field="site" placeholder="Injection site (optional)" value="' + esc(inj.site) + '" /></div>' +
+      '<div class="log-row"><input type="text" data-log-field="note" placeholder="Side-effect notes (optional)" value="' + esc(inj.note) + '" /></div>' +
+      '<button type="button" class="text-btn subtle done-editing-log-btn" data-entry-key="' + entryKey + '">Done</button>' +
+      '</li>';
+  }
+
+  // header + dose list for one vial. collapsible=true hides the list behind a "Show doses" toggle (used on Inventory).
+  function vialDoseGroupHTML(vial, collapsible) {
+    var conc = vialConcentration(vial);
+    var injections = vial.injections || [];
+    var rows = injections.map(function (inj, idx) { return doseLineHTML(vial, inj, idx, conc); }).join("");
+    var doseListHTML = '<ul class="dose-line-list">' + (rows || '<li class="field-hint">No doses logged yet</li>') + '</ul>';
+    var headerHTML = '' +
+      '<div class="dose-group-header">' +
+      '<div><strong>' + esc(vial.peptideName) + '</strong> <span class="mono vial-id">' + esc(vial.id) + '</span></div>' +
+      '<div class="field-hint">Mixed ' + esc(vial.reconstitutedDate || "\u2014") + ' \u00b7 ' + injections.length + (vial.plannedDoses ? ' of ' + vial.plannedDoses : '') + ' doses</div>' +
+      '</div>';
+    if (collapsible) {
+      var expanded = expandedVialDosesId === vial.id;
+      return headerHTML +
+        '<button type="button" class="text-btn toggle-vial-doses-btn" data-vial-id="' + esc(vial.id) + '">' +
+        (expanded ? "\u25be Hide doses" : "\u25b8 Show doses (" + injections.length + ")") + '</button>' +
+        (expanded ? doseListHTML : "");
+    }
+    return headerHTML + doseListHTML;
+  }
+
+  function renderLogTab(d) {
+    // group by vial (any vial with at least one logged dose — active or finished, so history isn't lost on completion)
+    var vialsWithDoses = state.inventory.vials.filter(function (v) { return (v.injections || []).length > 0; });
+    vialsWithDoses.sort(function (a, b) { return (b.reconstitutedDate || "").localeCompare(a.reconstitutedDate || ""); });
+    var vialGroupsHTML = vialsWithDoses.map(function (v) {
+      return '<div class="dose-group">' + vialDoseGroupHTML(v, false) + '</div>';
+    }).join("");
+
+    // ad-hoc entries not tied to any vial, shown separately underneath
+    var adhocEntries = state.log.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    var adhocItems = adhocEntries.map(function (e) {
+      var entryKey = "log:" + e.id;
+      var isEditing = editingLogEntryKey === entryKey;
+      var idAttrs = 'data-source="log" data-ref-id="' + esc(e.id) + '"';
+      var headerLine = e.peptideName
+        ? '<strong>' + esc(e.peptideName) + '</strong> <span class="field-hint">(not linked to inventory)</span>'
+        : '<span class="missing-name-flag">No peptide name \u2014 </span><input type="text" data-log-field="peptideName" class="inline-name-fix" placeholder="Add peptide name" value="" />';
+      var doseVolText = (function () {
+        var parts = [];
+        if (e.doseLabel) parts.push(esc(e.doseLabel));
+        if (e.volumeML != null) parts.push(fmt(e.volumeML, 3) + ' mL');
+        return parts.length ? parts.join(' \u00b7 ') : '<span class="field-hint">No dose recorded</span>';
+      })();
+
+      if (!isEditing) {
+        var showSiteInput = quickAddTarget && quickAddTarget.entryKey === entryKey && quickAddTarget.field === "site";
+        var showNoteInput = quickAddTarget && quickAddTarget.entryKey === entryKey && quickAddTarget.field === "note";
+        var metaBits = [esc(e.date), doseVolText];
+        if (e.site && !showSiteInput) metaBits.push(esc(e.site));
+        var siteInputRow = showSiteInput
+          ? '<div class="log-row quick-add-row"><input type="text" class="quick-add-input" data-entry-key="' + entryKey + '" data-field="site" placeholder="Injection site" value="' + esc(e.site) + '" autofocus /><button type="button" class="text-btn save-quickadd-btn" data-entry-key="' + entryKey + '" data-field="site">Save</button></div>'
+          : "";
+        var noteInputRow = showNoteInput
+          ? '<div class="log-row quick-add-row"><input type="text" class="quick-add-input" data-entry-key="' + entryKey + '" data-field="note" placeholder="Note" value="' + esc(e.note) + '" autofocus /><button type="button" class="text-btn save-quickadd-btn" data-entry-key="' + entryKey + '" data-field="note">Save</button></div>'
+          : "";
+        var noteDisplay = (e.note && !showNoteInput) ? '<div class="log-compact-note">' + esc(e.note) + '</div>' : "";
+        var siteAddBtn = (!e.site && !showSiteInput) ? '<button type="button" class="text-btn subtle quick-add-btn" data-entry-key="' + entryKey + '" data-field="site">+ Location</button>' : "";
+        var noteAddBtn = (!e.note && !showNoteInput) ? '<button type="button" class="text-btn subtle quick-add-btn" data-entry-key="' + entryKey + '" data-field="note">+ Note</button>' : "";
+        return '' +
+          '<li class="log-item" ' + idAttrs + '>' +
+          '<div class="log-row log-row-header">' + headerLine + '</div>' +
+          '<div class="log-compact-meta">' + metaBits.join(' \u00b7 ') + '</div>' +
+          siteInputRow + noteDisplay + noteInputRow +
+          '<div class="log-compact-actions">' + siteAddBtn + noteAddBtn +
+          '<button type="button" class="text-btn subtle edit-log-entry-btn" data-entry-key="' + entryKey + '">Edit</button>' +
+          '</div>' +
+          '</li>';
+      }
+      return '' +
+        '<li class="log-item log-item-editing" ' + idAttrs + '>' +
+        '<div class="log-row log-row-header">' + headerLine + '</div>' +
         '<div class="log-row">' +
         '<input type="date" data-log-field="date" value="' + esc(e.date) + '" />' +
-        '<span class="log-dose">' + esc(e.doseLabel) + ' · ' + fmt(e.volumeML, 3) + ' mL</span>' +
+        '<span class="log-dose">' + doseVolText + '</span>' +
         '<button class="text-btn remove-log-btn">Remove</button>' +
         '</div>' +
         '<div class="log-row"><input type="text" data-log-field="site" placeholder="Injection site (optional)" value="' + esc(e.site) + '" /></div>' +
         '<div class="log-row"><input type="text" data-log-field="note" placeholder="Side-effect notes (optional)" value="' + esc(e.note) + '" /></div>' +
+        '<button type="button" class="text-btn subtle done-editing-log-btn" data-entry-key="' + entryKey + '">Done</button>' +
         '</li>';
     }).join("");
 
+    var totalDoses = getAllTrackerEntries().length;
     return '' +
       '<section class="card">' +
-      '<h2>Tracker</h2>' +
-      '<div class="summary-strip" id="summary-strip">' + renderSummaryStrip(d) + '</div>' +
-      '<p class="card-desc small">"Theoretical remaining" is arithmetic only (starting amount minus what you\'ve logged) — it does not account for draw losses, dead space, or measurement error. Don\'t rely on it to judge whether a vial is truly empty or still sterile/usable.</p>' +
-      (state.log.length === 0
-        ? '<div class="notice">No injections logged yet. Log one from the "Dose" tab.</div>'
-        : '<ul class="log-list" id="log-list">' + items + '</ul>') +
+      '<h2>Dose Tracker</h2>' +
+      '<p class="card-desc small">' + totalDoses + ' dose' + (totalDoses === 1 ? "" : "s") + ' logged, grouped by vial \u2014 newest vial first, oldest dose first within each.</p>' +
+      (vialsWithDoses.length === 0
+        ? '<div class="notice">No doses logged against a vial yet. Log one from the "Dose" tab, or from an active vial in Inventory.</div>'
+        : vialGroupsHTML) +
+      (adhocEntries.length > 0
+        ? '<h3 class="section-h">Not linked to inventory</h3><ul class="log-list">' + adhocItems + '</ul>'
+        : "") +
+      '<button class="text-btn" id="toggle-adhoc-dose-btn" style="margin-top:10px">' + (addingAdhocDose ? "Cancel" : "+ Add a dose that didn't come from inventory") + '</button>' +
+      (addingAdhocDose ? adhocDoseFormHTML() : "") +
+      '<button class="text-btn" id="manual-save-tracker-btn" style="margin-top:10px">Save tracker data</button>' +
       '<div class="contact-reminder">Notice a new or worsening side effect, a missed dose, or anything that doesn\'t match your instructions? Contact your prescriber or pharmacist before your next injection.</div>' +
       '<div class="danger-zone" id="danger-zone">' + renderDangerZone(false) + '</div>' +
       '</section>';
   }
 
+  function adhocDoseFormHTML() {
+    return '' +
+      '<div class="recon-form">' +
+      '<p class="card-desc small">For a dose you\'re recording after the fact \u2014 not calculated here and not tied to a specific inventory vial.</p>' +
+      field("Peptide / compound name", "optional", '<input type="text" id="adhoc-peptideName" placeholder="e.g. BPC-157" />') +
+      '<div class="grid-2">' +
+      field("Date", null, '<input type="date" id="adhoc-date" value="' + todayISO() + '" />') +
+      field("Volume (mL)", "optional", '<input type="number" min="0" step="any" id="adhoc-volumeML" placeholder="e.g. 0.05" />') +
+      '</div>' +
+      '<div class="grid-2">' +
+      field("Dose amount", "optional", '<div class="input-row"><input type="number" min="0" step="any" id="adhoc-amount" placeholder="e.g. 250" />' +
+        '<select id="adhoc-unit">' + opt("mcg", "mcg") + opt("mg", "mg") + '</select></div>') +
+      field("Injection site", "optional", '<input type="text" id="adhoc-site" placeholder="e.g. left thigh" />') +
+      '</div>' +
+      field("Notes", "optional", '<input type="text" id="adhoc-note" placeholder="optional" />') +
+      '<button class="primary-btn" id="confirm-adhoc-dose-btn">Add to tracker</button>' +
+      '</div>';
+  }
+
   function renderSummaryStrip(d) {
     return '' +
       '<div><div class="summary-label">Theoretical remaining</div><div class="summary-value">' + (d.hasVial ? fmt(d.remainingMcg / 1000, 3) + " mg" : "—") + '</div></div>' +
-      '<div><div class="summary-label">Doses logged</div><div class="summary-value">' + state.log.length + '</div></div>' +
+      '<div><div class="summary-label">Doses logged</div><div class="summary-value">' + getAllTrackerEntries().length + '</div></div>' +
       '<div><div class="summary-label">Discard date</div><div class="summary-value">' + esc(state.meta.discardDate || "not set") + '</div></div>';
   }
 
@@ -584,19 +1229,46 @@
 
   function renderLabelTab(d) {
     var l = state.label;
+    var invSummary = inventorySummary(state.inventory);
+    var options = ['<option value="adhoc"' + (labelSelection === "adhoc" ? " selected" : "") + '>Ad-hoc calculation (Vial &amp; Mix tab)</option>'];
+    invSummary.activeVials.forEach(function (v) {
+      var val = "vial:" + v.id;
+      options.push('<option value="' + val + '"' + (labelSelection === val ? " selected" : "") + '>' + esc(v.peptideName) + ' (' + esc(v.id) + ') \u2014 active</option>');
+    });
+    invSummary.unopenedGroups.forEach(function (g) {
+      if (!g.purchaseId) return;
+      var val = "batch:" + g.purchaseId;
+      var label = esc(g.peptideName) + ' \u2014 unopened batch' + (g.supplier ? ' (' + esc(g.supplier) + ')' : '');
+      options.push('<option value="' + val + '"' + (labelSelection === val ? " selected" : "") + '>' + label + '</option>');
+    });
+
+    var previewHTML, canPrint;
+    if (labelSelection === "adhoc") {
+      previewHTML = labelCardHTML(d);
+      canPrint = d.hasVial;
+    } else if (labelSelection.indexOf("vial:") === 0) {
+      var vial = state.inventory.vials.filter(function (v) { return v.id === labelSelection.slice(5); })[0];
+      previewHTML = vial ? vialLabelCardHTML(vial) : '<div class="notice">That vial isn\'t available anymore.</div>';
+      canPrint = !!vial;
+    } else {
+      var purchase = state.inventory.purchases.filter(function (p) { return p.id === labelSelection.slice(6); })[0];
+      previewHTML = purchase ? batchLabelCardHTML(purchase) : '<div class="notice">That batch isn\'t available anymore.</div>';
+      canPrint = !!purchase;
+    }
+
     return '' +
       '<section class="card">' +
       '<h2>Print label</h2>' +
-      '<p class="card-desc">Prints on regular sticker/adhesive paper from any printer. Pick a size, then cut along the dashed lines. This is a personal reference label, not a substitute for the pharmacy\'s own label — keep the original vial packaging and instructions.</p>' +
-      (!d.hasVial ? '<div class="notice">Fill in the vial &amp; mix tab first so the label has something to print.</div>' : "") +
+      '<p class="card-desc">Prints on regular sticker/adhesive paper from any printer. Pick what to print, a size, then cut along the dashed lines.</p>' +
+      field("What to print", null, '<select id="label-selection-select">' + options.join("") + '</select>') +
       '<div class="grid-2">' +
       field("Label size", null,
         '<select data-path="label.size">' + Object.keys(LABEL_SIZES).map(function (id) { return opt(id, l.size, LABEL_SIZES[id].name); }).join("") + '</select>') +
       field("Copies on sheet", "Repeats the same label so you can cut several",
         '<select data-path="label.copies" data-numeric="1">' + [1, 2, 4, 6, 8, 12].map(function (n) { return opt(String(n), String(l.copies), String(n)); }).join("") + '</select>') +
       '</div>' +
-      '<div class="label-preview-frame" id="label-preview">' + labelCardHTML(d) + '</div>' +
-      '<button class="primary-btn" id="print-btn" ' + (d.hasVial ? "" : "disabled") + '>Print label sheet</button>' +
+      '<div class="label-preview-frame" id="label-preview">' + previewHTML + '</div>' +
+      '<button class="primary-btn" id="print-btn" ' + (canPrint ? "" : "disabled") + '>Print label sheet</button>' +
       '</section>';
   }
 
@@ -605,9 +1277,75 @@
     var inv = state.inventory;
     var s = inventorySummary(inv);
 
-    var purchaseForm = '' +
-      '<div class="subcard">' +
-      '<h3>Log a purchase</h3>' +
+    var purchaseSection = '' +
+      '<div class="collapsible-fn">' +
+      '<button type="button" class="collapsible-fn-toggle" id="toggle-purchase-form-btn">' +
+      (purchaseFormOpen ? "\u25be" : "\u25b8") + ' Log a purchase' +
+      '</button>' +
+      (purchaseFormOpen ? purchaseFormHTML(true) : "") +
+      '</div>';
+
+    var stackSection = '' +
+      '<div class="collapsible-fn">' +
+      '<button type="button" class="collapsible-fn-toggle" id="toggle-stack-form-btn">' +
+      (stackSectionOpen ? "\u25be" : "\u25b8") + ' Stack an injection' +
+      '</button>' +
+      (stackSectionOpen
+        ? '<p class="card-desc small">Combine two or more reconstituted vials into a single syringe draw. Each vial is reconstituted separately as usual \u2014 this just logs a combined injection and counts a dose against every vial included.</p>' + renderStackBuilderHTML(s.activeVials)
+        : "") +
+      '</div>';
+
+    var unopenedHTML = s.unopenedGroups.length === 0 ? "" : s.unopenedGroups.map(function (g) {
+      var existingActive = findActiveVialMatch(g.peptideName);
+      var blocked = !!existingActive;
+      var lowStock = g.count <= 1;
+      return '' +
+        '<div class="vial-group">' +
+        '<div class="vial-group-head">' +
+        '<div><strong>' + esc(g.peptideName) + '</strong> <span class="field-hint">' + g.count + ' unopened \u00b7 ' + fmt(g.strengthMg, 2) + ' mg each' + (g.vialSizeML ? ' \u00b7 ' + esc(g.vialSizeML) + ' mL vial' : '') + '</span>' +
+        (lowStock ? ' <span class="reorder-flag">Reorder soon</span>' : '') + '</div>' +
+        (blocked
+          ? '<span class="field-hint">Active: <span class="mono vial-id">' + esc(existingActive.id) + '</span>' + (isVialExpired(existingActive) ? ' <span class="reorder-flag expired-flag">Expired</span>' : '') + '</span>'
+          : '<span class="field-hint">Ready to reconstitute</span>') +
+        '</div>' +
+        (g.purchaseId ? '<div class="field-hint">' + (g.labelPrinted ? "Label printed " + esc(g.labelPrintedDate) : "Label not printed yet") + ' \u00b7 <button class="text-btn print-batch-label-btn" data-purchase-id="' + esc(g.purchaseId) + '">' + (g.labelPrinted ? "Reprint" : "Print") + ' batch label</button></div>' : "") +
+        '</div>';
+    }).join("");
+
+    var activeHTML = s.activeVials.length === 0
+      ? '<div class="notice">No active vials. Go to Start \u2192 Reconstitute a vial to open one.</div>'
+      : s.activeVials.map(function (v) { return activeVialCardHTML(v); }).join("");
+
+    var stackHistoryHTML = renderStackHistoryHTML();
+
+    var finishedHTML = s.finishedVials.length === 0
+      ? '<div class="notice">No finished vials yet.</div>'
+      : '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Vial ID</th><th>Peptide</th><th>Opened</th><th>Finished</th></tr></thead><tbody>' +
+        s.finishedVials.slice().reverse().map(function (v) {
+          return '<tr><td class="mono">' + esc(v.id) + '</td><td>' + esc(v.peptideName) + '</td><td>' + esc(v.reconstitutedDate || "—") + '</td><td>' + esc(v.finishedDate || "—") + '</td></tr>';
+        }).join("") + '</tbody></table></div>';
+
+    return '' +
+      '<section class="card">' +
+      '<h2>Inventory</h2>' +
+      '<p class="card-desc">What\'s in stock, what\'s open, and what\'s been done with it.</p>' +
+      purchaseSection +
+      stackSection +
+      '<h3 class="section-h">Unopened (in stock)</h3>' +
+      (unopenedHTML || '<div class="notice">Nothing unopened right now.</div>') +
+      '<h3 class="section-h">Reconstituted (opened)</h3>' +
+      activeHTML +
+      (stackHistoryHTML ? stackHistoryHTML : "") +
+      '<h3 class="section-h">Finished</h3>' +
+      finishedHTML +
+      (s.finishedVials.length > 0 || s.activeVials.length > 0
+        ? '<button class="primary-btn secondary-btn" id="print-report-btn" style="margin-top:14px">Print full inventory report</button>'
+        : "") +
+      '</section>';
+  }
+
+  function purchaseFormHTML(bare) {
+    var fields = '' +
       '<div class="grid-2">' +
       field("Peptide name", null, '<input type="text" id="inv-peptideName" placeholder="e.g. BPC-157" />') +
       field("Supplier", "optional", '<input type="text" id="inv-supplier" placeholder="e.g. ABC Pharmacy" />') +
@@ -617,60 +1355,12 @@
       field("Strength per vial (mg)", null, '<input type="number" min="0" step="any" id="inv-strengthMg" placeholder="e.g. 10" />') +
       '</div>' +
       '<div class="grid-2">' +
+      field("Vial size (mL)", "physical container size, optional", '<input type="number" min="0" step="any" id="inv-vialSizeML" placeholder="e.g. 5" />') +
       field("Purchase date", null, '<input type="date" id="inv-purchaseDate" value="' + todayISO() + '" />') +
-      field("Lot number", "optional", '<input type="text" id="inv-lotNumber" placeholder="optional" />') +
       '</div>' +
-      '<button class="primary-btn" id="add-purchase-btn">Add purchase</button>' +
-      '</div>';
-
-    var summaryHTML = '' +
-      '<div class="summary-strip inv-summary">' +
-      '<div><div class="summary-label">Total purchased</div><div class="summary-value">' + fmt(s.totalPurchasedMg, 2) + ' mg</div></div>' +
-      '<div><div class="summary-label">Remaining (est.)</div><div class="summary-value">' + fmt(s.remainingMg, 2) + ' mg</div></div>' +
-      '<div><div class="summary-label">Unopened</div><div class="summary-value">' + s.unopenedCount + '</div></div>' +
-      '<div><div class="summary-label">Active</div><div class="summary-value">' + s.activeCount + '</div></div>' +
-      '<div><div class="summary-label">Finished</div><div class="summary-value">' + s.finishedCount + '</div></div>' +
-      '</div>';
-
-    var unopenedHTML = s.unopenedGroups.length === 0 ? "" : s.unopenedGroups.map(function (g) {
-      var isOpen = reconstitutingPeptide === g.peptideName;
-      return '' +
-        '<div class="vial-group">' +
-        '<div class="vial-group-head">' +
-        '<div><strong>' + esc(g.peptideName) + '</strong> <span class="field-hint">' + g.count + ' unopened · ' + fmt(g.strengthMg, 2) + ' mg each</span></div>' +
-        '<button class="text-btn recon-toggle-btn" data-peptide="' + esc(g.peptideName) + '">' + (isOpen ? "Cancel" : "Reconstitute next vial") + '</button>' +
-        '</div>' +
-        (isOpen ? reconstituteFormHTML(g) : "") +
-        '</div>';
-    }).join("");
-
-    var activeHTML = s.activeVials.length === 0
-      ? '<div class="notice">No active vials. Reconstitute one from an unopened batch above.</div>'
-      : s.activeVials.map(function (v) { return activeVialCardHTML(v); }).join("");
-
-    var finishedHTML = s.finishedVials.length === 0
-      ? '<div class="notice">No finished vials yet.</div>'
-      : '<table class="history-table"><thead><tr><th>Vial ID</th><th>Peptide</th><th>Opened</th><th>Finished</th></tr></thead><tbody>' +
-        s.finishedVials.slice().reverse().map(function (v) {
-          return '<tr><td class="mono">' + esc(v.id) + '</td><td>' + esc(v.peptideName) + '</td><td>' + esc(v.reconstitutedDate || "—") + '</td><td>' + esc(v.finishedDate || "—") + '</td></tr>';
-        }).join("") + '</tbody></table>';
-
-    return '' +
-      '<section class="card">' +
-      '<h2>Inventory</h2>' +
-      '<p class="card-desc">Log a purchase once, then reconstitute vials from it as you open them. Each vial gets its own ID, label, and injection history.</p>' +
-      summaryHTML +
-      purchaseForm +
-      '<h3 class="section-h">Unopened batches</h3>' +
-      (unopenedHTML || '<div class="notice">No unopened vials on hand. Add a purchase above.</div>') +
-      '<h3 class="section-h">Active vials</h3>' +
-      activeHTML +
-      '<h3 class="section-h">Finished vials</h3>' +
-      finishedHTML +
-      (s.finishedVials.length > 0 || s.activeVials.length > 0
-        ? '<button class="primary-btn secondary-btn" id="print-report-btn" style="margin-top:14px">Print inventory report</button>'
-        : "") +
-      '</section>';
+      field("Lot number", "optional", '<input type="text" id="inv-lotNumber" placeholder="optional" />') +
+      '<button class="primary-btn" id="add-purchase-btn">Add purchase</button>';
+    return bare ? fields : '<div class="subcard"><h3>Log a purchase</h3>' + fields + '</div>';
   }
 
   function reconstituteFormHTML(g) {
@@ -681,17 +1371,93 @@
       field("Reconstituted date", null, '<input type="date" id="recon-date" value="' + todayISO() + '" />') +
       '</div>' +
       '<div class="grid-2">' +
-      field("Expiry / discard date", "From pharmacist instructions", '<input type="date" id="recon-expiry" />') +
+      field("Discard after", "How long until it must be discarded, per instructions",
+        '<select id="recon-expiry-duration">' +
+        '<option value="7">1 week</option>' +
+        '<option value="14">2 weeks</option>' +
+        '<option value="21" selected>3 weeks</option>' +
+        '<option value="28">4 weeks</option>' +
+        '<option value="42">6 weeks</option>' +
+        '<option value="56">8 weeks</option>' +
+        '<option value="custom">Custom date\u2026</option>' +
+        '</select>' +
+        '<div class="field-hint" id="recon-expiry-preview" style="margin-top:4px"></div>' +
+        '<input type="date" id="recon-expiry-custom" style="display:none;margin-top:6px" />') +
       field("Planned injections", "Circles printed on the label", '<input type="number" min="1" id="recon-plannedDoses" value="8" />') +
       '</div>' +
       '<div class="grid-2">' +
       field("Dose per injection", null,
         '<div class="input-row"><input type="number" min="0" step="any" id="recon-doseAmount" placeholder="e.g. 250" />' +
         '<select id="recon-doseUnit"><option value="mcg">mcg</option><option value="mg">mg</option><option value="units">units (syringe)</option></select></div>') +
-      '<div></div>' +
+      field("Frequency", "As instructed \u2014 e.g. \"2x/week\", \"daily\", \"EOD\"", '<input type="text" id="recon-frequency" placeholder="e.g. 2x per week" />') +
       '</div>' +
-      '<button class="primary-btn" id="confirm-recon-btn" data-peptide="' + esc(g.peptideName) + '">Confirm reconstitution</button>' +
+      '<button class="primary-btn" id="confirm-recon-btn" data-peptide="' + esc(g.peptideName) + '" data-purchase-id="' + esc(g.purchaseId || "") + '">Confirm reconstitution</button>' +
       '</div>';
+  }
+
+  function renderStackBuilderHTML(activeVials) {
+    if (activeVials.length === 0) {
+      return '<div class="notice">No active vials to stack yet. Reconstitute at least two vials above first.</div>';
+    }
+    var rows = activeVials.map(function (v) {
+      var conc = vialConcentration(v);
+      return '' +
+        '<div class="stack-row">' +
+        '<label class="stack-check-label"><input type="checkbox" class="stack-check" data-vial-id="' + v.id + '" /> ' +
+        '<strong>' + esc(v.peptideName) + '</strong> <span class="field-hint mono">' + esc(v.id) + ' · ' + fmt(conc / 1000, 3) + ' mg/mL</span></label>' +
+        '<div class="input-row">' +
+        '<input type="number" min="0" step="any" class="stack-amount" data-vial-id="' + v.id + '" placeholder="dose" />' +
+        '<select class="stack-unit" data-vial-id="' + v.id + '"><option value="mcg">mcg</option><option value="mg">mg</option><option value="units">units</option></select>' +
+        '</div>' +
+        '</div>';
+    }).join("");
+
+    return '' +
+      '<div class="subcard">' +
+      rows +
+      '<div class="grid-2" style="margin-top:12px">' +
+      field("Syringe", null,
+        '<select id="stack-syringe">' + SYRINGES.map(function (sy) { return opt(sy.id, "u100", sy.label); }).join("") + '</select>') +
+      field("Date &amp; time", null, '<input type="datetime-local" id="stack-datetime" />') +
+      '</div>' +
+      '<div class="grid-2">' +
+      field("Injection site", "optional", '<input type="text" id="stack-site" placeholder="e.g. abdomen" />') +
+      field("Notes", "optional", '<input type="text" id="stack-notes" placeholder="optional" />') +
+      '</div>' +
+      '<button class="primary-btn" id="log-stack-btn">Log stacked injection</button>' +
+      '</div>';
+  }
+
+  function renderStackHistoryHTML() {
+    if (state.stacks.length === 0) return "";
+    var rows = state.stacks.map(function (st) {
+      var compLines = st.components.map(function (c) {
+        return '<div class="vial-card-row mono">' + esc(c.peptideName) + ' (' + esc(c.vialId) + '): ' + esc(c.doseAmount) + ' ' + esc(c.doseUnit) + ' \u2192 ' + fmt(c.volumeML, 3) + ' mL</div>';
+      }).join("");
+      return '' +
+        '<div class="vial-card">' +
+        '<div class="vial-card-head"><strong>Stacked injection</strong><span class="field-hint">' + esc(st.date) + (st.time ? " " + esc(st.time) : "") + '</span></div>' +
+        compLines +
+        '<div class="vial-card-row mono">Total: ' + fmt(st.totalVolumeML, 3) + ' mL (' + fmt(st.totalUnits, 1) + ' units)</div>' +
+        (st.site ? '<div class="vial-card-row">Site: ' + esc(st.site) + '</div>' : "") +
+        (st.notes ? '<div class="vial-card-row">' + esc(st.notes) + '</div>' : "") +
+        (st.overCapacity ? '<div class="warn-text">This total exceeded the selected syringe\'s capacity \u2014 double check before drawing.</div>' : "") +
+        '<div class="vial-card-actions"><button class="text-btn subtle delete-stack-btn" data-stack-id="' + st.id + '">Delete</button></div>' +
+        '</div>';
+    }).join("");
+    return '<h3 class="section-h">Stack history</h3>' + rows;
+  }
+
+  // lightweight toggle+list for use inside a card that already shows its own vial header
+  function doseListToggleHTML(vial) {
+    var injections = vial.injections || [];
+    var expanded = expandedVialDosesId === vial.id;
+    var conc = vialConcentration(vial);
+    var rows = injections.map(function (inj, idx) { return doseLineHTML(vial, inj, idx, conc); }).join("");
+    var doseListHTML = '<ul class="dose-line-list">' + (rows || '<li class="field-hint">No doses logged yet</li>') + '</ul>';
+    return '<button type="button" class="text-btn toggle-vial-doses-btn" data-vial-id="' + esc(vial.id) + '">' +
+      (expanded ? "\u25be Hide doses" : "\u25b8 Show doses (" + injections.length + ")") + '</button>' +
+      (expanded ? doseListHTML : "");
   }
 
   function activeVialCardHTML(v) {
@@ -699,24 +1465,49 @@
     var doseAmountNum = parseFloat(v.doseAmount) || 0;
     var conv = doseToVolume(doseAmountNum, v.doseUnit, conc);
     var doneCount = (v.injections || []).length;
+    var expired = isVialExpired(v);
     return '' +
-      '<div class="vial-card">' +
+      '<div class="vial-card' + (expired ? ' vial-card-expired' : '') + '">' +
       '<div class="vial-card-head">' +
-      '<div><span class="mono vial-id">' + esc(v.id) + '</span> <strong>' + esc(v.peptideName) + '</strong></div>' +
-      '<span class="field-hint">' + fmt(v.strengthMg, 2) + ' mg / ' + esc(v.diluentML) + ' mL</span>' +
+      '<div><span class="mono vial-id">' + esc(v.id) + '</span> <strong>' + esc(v.peptideName) + '</strong>' +
+      (expired ? ' <span class="reorder-flag expired-flag">Expired</span>' : '') + '</div>' +
+      '<span class="field-hint">' + fmt(v.strengthMg, 2) + ' mg' + (v.vialSizeML ? ' (' + esc(v.vialSizeML) + ' mL vial)' : '') + ' / ' + esc(v.diluentML) + ' mL diluent</span>' +
       '</div>' +
       '<div class="vial-card-row">Mixed: ' + esc(v.reconstitutedDate || "—") + ' · Expires: ' + esc(v.expiryDate || "—") + '</div>' +
       '<div class="vial-card-row mono">Concentration: ' + fmt(conc / 1000, 4) + ' mg/mL</div>' +
       (doseAmountNum > 0
         ? '<div class="vial-card-row mono">Dose: ' + esc(v.doseAmount) + ' ' + esc(v.doseUnit) + ' = ' + fmt(conv.volumeML, 3) + ' mL (' + fmt(conv.volumeML * 100, 1) + ' units)</div>'
         : "") +
-      '<div class="usage-row">Usage: ' + usageDotsHTML(v.plannedDoses, doneCount) + '</div>' +
+      (v.frequency ? '<div class="vial-card-row">Frequency: ' + esc(v.frequency) + '</div>' : "") +
+      doseListToggleHTML(v) +
+      '<div class="field-hint">' + (v.labelPrinted ? "Label printed " + esc(v.labelPrintedDate) : "Label not printed yet") + '</div>' +
+      (expired ? '<div class="warn-text">This vial is past its expiry/discard date. Complete it below to reconstitute a new one for ' + esc(v.peptideName) + '.</div>' : "") +
       '<div class="vial-card-actions">' +
       '<button class="text-btn log-injection-btn" data-vial-id="' + v.id + '">+ Log injection</button>' +
-      (doneCount > 0 ? '<button class="text-btn subtle undo-injection-btn" data-vial-id="' + v.id + '">Undo last</button>' : "") +
-      '<button class="text-btn print-vial-btn" data-vial-id="' + v.id + '">Print label</button>' +
+      '<button class="text-btn print-vial-btn" data-vial-id="' + v.id + '">' + (v.labelPrinted ? "Reprint label" : "Print label") + '</button>' +
+      '<button class="text-btn subtle edit-vial-btn" data-vial-id="' + v.id + '">' + (editingVialId === v.id ? "Cancel edit" : "Edit") + '</button>' +
       '<button class="text-btn subtle complete-vial-btn" data-vial-id="' + v.id + '">Complete vial</button>' +
       '</div>' +
+      (editingVialId === v.id ? vialEditFormHTML(v) : "") +
+      '</div>';
+  }
+
+  function vialEditFormHTML(v) {
+    return '' +
+      '<div class="recon-form">' +
+      '<p class="card-desc small">Update these if your pharmacist or prescriber changed your instructions \u2014 this only edits what you\'ve recorded, it doesn\'t suggest new values.</p>' +
+      '<div class="grid-2">' +
+      field("Diluent (mL)", null, '<input type="number" min="0" step="any" id="edit-diluentML" value="' + esc(v.diluentML) + '" />') +
+      field("Expiry / discard date", null, '<input type="date" id="edit-expiry" value="' + esc(v.expiryDate) + '" />') +
+      '</div>' +
+      '<div class="grid-2">' +
+      field("Planned injections", null, '<input type="number" min="1" id="edit-plannedDoses" value="' + esc(v.plannedDoses) + '" />') +
+      field("Dose per injection", null,
+        '<div class="input-row"><input type="number" min="0" step="any" id="edit-doseAmount" value="' + esc(v.doseAmount) + '" />' +
+        '<select id="edit-doseUnit">' + opt("mcg", v.doseUnit) + opt("mg", v.doseUnit) + opt("units", v.doseUnit, "units (syringe)") + '</select></div>') +
+      '</div>' +
+      field("Frequency", "As instructed \u2014 e.g. \"2x/week\", \"daily\", \"EOD\"", '<input type="text" id="edit-frequency" value="' + esc(v.frequency || "") + '" placeholder="e.g. 2x per week" />') +
+      '<button class="primary-btn" id="confirm-edit-vial-btn" data-vial-id="' + v.id + '">Save changes</button>' +
       '</div>';
   }
 
@@ -760,6 +1551,17 @@
       '</section>';
   }
 
+  function renderReferenceTab() {
+    return '' +
+      '<section class="card">' +
+      '<h2>Reference</h2>' +
+      '<p class="card-desc">A place to keep links you find useful \u2014 pharmacist/prescriber contact info, storage guidance, official product inserts, whatever\'s relevant to you. This is just a placeholder for now; tell me what you\'d like here and I\'ll fill it in.</p>' +
+      '<ul class="reference-list">' +
+      '<li class="field-hint">No links added yet</li>' +
+      '</ul>' +
+      '</section>';
+  }
+
   function field(label, hint, innerHTML) {
     return '<label class="field"><span class="field-label">' + esc(label) + '</span>' + innerHTML +
       (hint ? '<span class="field-hint">' + esc(hint) + '</span>' : "") + '</label>';
@@ -782,7 +1584,7 @@
       '<div class="safety-banner">This tool only performs math on numbers you enter and helps you log injections. It does not recommend, calculate, or adjust doses. Follow your prescriber\'s or pharmacist\'s instructions — if anything here doesn\'t match what they told you, contact them before injecting.</div>' +
       '</header>' +
       '<nav class="tabs" role="tablist">' +
-      tabButton("vial", "Vial & mix") + tabButton("dose", "Dose") + tabButton("log", "Tracker") + tabButton("label", "Print label") + tabButton("inventory", "Inventory") + tabButton("saved", "Saved") + tabButton("about", "About") +
+      tabButton("start", "Start") + tabButton("vial", "Vial & mix") + tabButton("dose", "Dose") + tabButton("log", "Dose Tracker") + tabButton("label", "Print label") + tabButton("inventory", "Inventory") + tabButton("saved", "Saved") + tabButton("about", "About") + tabButton("reference", "Reference") +
       '</nav>' +
       '<main class="content" id="content"></main>' +
       '</div>';
@@ -797,13 +1599,15 @@
   function renderContent() {
     var d = derive();
     var content = document.getElementById("content");
-    if (currentTab === "vial") content.innerHTML = renderVialTab(d);
+    if (currentTab === "start") content.innerHTML = renderStartTab(d);
+    else if (currentTab === "vial") content.innerHTML = renderVialTab(d);
     else if (currentTab === "dose") content.innerHTML = renderDoseTab(d);
     else if (currentTab === "log") content.innerHTML = renderLogTab(d);
     else if (currentTab === "label") content.innerHTML = renderLabelTab(d);
     else if (currentTab === "inventory") content.innerHTML = renderInventoryTab();
     else if (currentTab === "saved") content.innerHTML = renderSavedTab();
     else if (currentTab === "about") content.innerHTML = renderAboutTab();
+    else if (currentTab === "reference") content.innerHTML = renderReferenceTab();
     attachContentHandlers();
   }
 
@@ -823,10 +1627,35 @@
     if (strip) strip.innerHTML = renderSummaryStrip(d);
 
     var preview = document.getElementById("label-preview");
-    if (preview) preview.innerHTML = labelCardHTML(d);
+    if (preview) {
+      if (labelSelection === "adhoc") {
+        preview.innerHTML = labelCardHTML(d);
+      } else if (labelSelection.indexOf("vial:") === 0) {
+        var previewVial = state.inventory.vials.filter(function (v) { return v.id === labelSelection.slice(5); })[0];
+        if (previewVial) preview.innerHTML = vialLabelCardHTML(previewVial);
+      } else if (labelSelection.indexOf("batch:") === 0) {
+        var previewPurchase = state.inventory.purchases.filter(function (p) { return p.id === labelSelection.slice(6); })[0];
+        if (previewPurchase) preview.innerHTML = batchLabelCardHTML(previewPurchase);
+      }
+    }
 
     var printBtn = document.getElementById("print-btn");
-    if (printBtn) printBtn.disabled = !d.hasVial;
+    if (printBtn && labelSelection === "adhoc") printBtn.disabled = !d.hasVial;
+
+    var vialMatchBox = document.getElementById("vial-inventory-match");
+    if (vialMatchBox) vialMatchBox.innerHTML = inventoryMatchHTML(state.vial.compoundName);
+
+    var wizardDoseVial = state.inventory.vials.filter(function (v) { return v.id === dosingVialId; })[0];
+    if (wizardDoseVial) {
+      var wConc = vialConcentration(wizardDoseVial);
+      var wAmount = parseFloat(state.dose.amount) || 0;
+      var wConv = doseToVolume(wAmount, state.dose.unit, wConc);
+      var wHasAmount = wAmount > 0;
+      var wizardDoseResultPanel = document.getElementById("wizard-dose-result-panel");
+      if (wizardDoseResultPanel) { wizardDoseResultPanel.className = "result-panel " + (wHasAmount ? "" : "muted"); wizardDoseResultPanel.innerHTML = renderWizardDoseResult(wConv, wHasAmount); }
+      var wizardAddDoseConfirmBtn = document.getElementById("wizard-add-dose-confirm-btn");
+      if (wizardAddDoseConfirmBtn) wizardAddDoseConfirmBtn.disabled = !wHasAmount;
+    }
   }
 
   // ---------- event wiring ----------
@@ -835,6 +1664,10 @@
     tabs.forEach(function (btn) {
       btn.addEventListener("click", function () {
         currentTab = btn.getAttribute("data-tab");
+        if (currentTab === "start") {
+          wizardStep = 1;
+          wizardFlow = null;
+        }
         var allTabs = document.querySelectorAll(".tab");
         allTabs.forEach(function (b) {
           var active = b === btn;
@@ -843,6 +1676,19 @@
         });
         renderContent();
       });
+    });
+
+    // delegated (bound once) so it keeps working even though the match box re-renders on every keystroke
+    var contentEl = document.getElementById("content");
+    contentEl.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest("#use-inventory-match-btn") : null;
+      if (!btn) return;
+      var m = findInventoryMatch(state.vial.compoundName);
+      if (!m) return;
+      state.vial.totalAmount = String(m.strengthMg);
+      state.vial.totalUnit = "mg";
+      saveStateDebounced();
+      renderContent();
     });
   }
 
@@ -862,29 +1708,116 @@
       });
     });
 
-    // log entry fields
+    // log entry fields (source-aware: routes to state.log or the owning vial's injections)
     var logFieldEls = content.querySelectorAll("[data-log-field]");
     logFieldEls.forEach(function (el) {
       var evt = el.type === "date" ? "change" : "input";
       el.addEventListener(evt, function () {
-        var item = el.closest("[data-log-id]");
-        var id = item.getAttribute("data-log-id");
+        var item = el.closest("[data-source]");
+        if (!item) return;
+        var source = item.getAttribute("data-source");
+        var refId = item.getAttribute("data-ref-id");
         var field = el.getAttribute("data-log-field");
-        var entry = state.log.filter(function (e) { return e.id === id; })[0];
+        var entry;
+        if (source === "vial") {
+          var vialRefId = item.getAttribute("data-vial-ref-id");
+          var vial = state.inventory.vials.filter(function (v) { return v.id === vialRefId; })[0];
+          entry = vial ? (vial.injections || []).filter(function (i) { return i.id === refId; })[0] : null;
+        } else {
+          entry = state.log.filter(function (e) { return e.id === refId; })[0];
+        }
         if (entry) entry[field] = el.value;
         saveStateDebounced();
       });
     });
 
-    // remove log entry
+    // tracker row expand/collapse (compact by default, edit fields on demand)
+    var editLogEntryBtns = content.querySelectorAll(".edit-log-entry-btn");
+    editLogEntryBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        editingLogEntryKey = btn.getAttribute("data-entry-key");
+        renderContent();
+      });
+    });
+    var doneEditingLogBtns = content.querySelectorAll(".done-editing-log-btn");
+    doneEditingLogBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        editingLogEntryKey = null;
+        renderContent();
+      });
+    });
+
+    // quick-add: reveal a single field (location or note) inline, without opening full edit mode
+    var quickAddBtns = content.querySelectorAll(".quick-add-btn");
+    quickAddBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        quickAddTarget = { entryKey: btn.getAttribute("data-entry-key"), field: btn.getAttribute("data-field") };
+        renderContent();
+      });
+    });
+
+    function saveQuickAdd(entryKey, field, value) {
+      var parts = entryKey.split(":");
+      var source = parts[0], refId = parts.slice(1).join(":");
+      var entry = null;
+      if (source === "vial") {
+        for (var i = 0; i < state.inventory.vials.length && !entry; i++) {
+          entry = (state.inventory.vials[i].injections || []).filter(function (inj) { return inj.id === refId; })[0] || null;
+        }
+      } else {
+        entry = state.log.filter(function (e) { return e.id === refId; })[0] || null;
+      }
+      if (entry) entry[field] = value;
+      quickAddTarget = null;
+      saveStateDebounced();
+      renderContent();
+    }
+
+    var saveQuickAddBtns = content.querySelectorAll(".save-quickadd-btn");
+    saveQuickAddBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var entryKey = btn.getAttribute("data-entry-key");
+        var field = btn.getAttribute("data-field");
+        var input = content.querySelector('.quick-add-input[data-entry-key="' + entryKey + '"][data-field="' + field + '"]');
+        saveQuickAdd(entryKey, field, input ? input.value : "");
+      });
+    });
+    var quickAddInputs = content.querySelectorAll(".quick-add-input");
+    quickAddInputs.forEach(function (input) {
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          saveQuickAdd(input.getAttribute("data-entry-key"), input.getAttribute("data-field"), input.value);
+        }
+      });
+    });
+
+    // remove log entry (source-aware)
     var removeBtns = content.querySelectorAll(".remove-log-btn");
     removeBtns.forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var item = btn.closest("[data-log-id]");
-        var id = item.getAttribute("data-log-id");
-        state.log = state.log.filter(function (e) { return e.id !== id; });
+        var item = btn.closest("[data-source]");
+        if (!item) return;
+        var source = item.getAttribute("data-source");
+        var refId = item.getAttribute("data-ref-id");
+        if (source === "vial") {
+          var vialRefId = item.getAttribute("data-vial-ref-id");
+          var vial = state.inventory.vials.filter(function (v) { return v.id === vialRefId; })[0];
+          if (vial) vial.injections = (vial.injections || []).filter(function (i) { return i.id !== refId; });
+        } else {
+          state.log = state.log.filter(function (e) { return e.id !== refId; });
+        }
+        editingLogEntryKey = null;
         saveStateDebounced();
         renderContent();
+      });
+    });
+
+    // view vial link (Tracker -> Inventory)
+    var viewVialLinks = content.querySelectorAll(".view-vial-link");
+    viewVialLinks.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        gotoInventoryTab();
       });
     });
 
@@ -894,16 +1827,7 @@
       logBtn.addEventListener("click", function () {
         var d = derive();
         if (!d.hasDose) return;
-        state.log.unshift({
-          id: uid(),
-          date: todayISO(),
-          doseMcg: d.doseMcg,
-          doseLabel: state.dose.amount + " " + state.dose.unit,
-          volumeML: d.drawVolumeML,
-          site: "",
-          note: ""
-        });
-        saveStateDebounced();
+        logCurrentDose(d);
         currentTab = "log";
         var allTabs = document.querySelectorAll(".tab");
         allTabs.forEach(function (b) {
@@ -939,19 +1863,284 @@
       });
     }
 
+    var manualSaveBtn = document.getElementById("manual-save-tracker-btn");
+    if (manualSaveBtn) {
+      manualSaveBtn.addEventListener("click", function () {
+        var ok = saveNow();
+        manualSaveBtn.textContent = ok ? "Saved \u2713" : "Could not save";
+        setTimeout(function () { if (manualSaveBtn) manualSaveBtn.textContent = "Save tracker data"; }, 1200);
+      });
+    }
+
+    var toggleAdhocBtn = document.getElementById("toggle-adhoc-dose-btn");
+    if (toggleAdhocBtn) {
+      toggleAdhocBtn.addEventListener("click", function () {
+        addingAdhocDose = !addingAdhocDose;
+        renderContent();
+      });
+    }
+    var confirmAdhocBtn = document.getElementById("confirm-adhoc-dose-btn");
+    if (confirmAdhocBtn) {
+      confirmAdhocBtn.addEventListener("click", function () {
+        var peptideName = (document.getElementById("adhoc-peptideName").value || "").trim();
+        var date = document.getElementById("adhoc-date").value || todayISO();
+        var volumeML = document.getElementById("adhoc-volumeML").value;
+        var amount = document.getElementById("adhoc-amount").value;
+        var unit = document.getElementById("adhoc-unit").value || "mcg";
+        var site = document.getElementById("adhoc-site").value || "";
+        var note = document.getElementById("adhoc-note").value || "";
+
+        if (!peptideName && !amount && !volumeML) {
+          alert("Add at least a peptide name, dose amount, or volume so this entry means something later.");
+          return;
+        }
+
+        state.log.unshift({
+          id: uid(),
+          date: date,
+          doseMcg: amount ? toMcg(parseFloat(amount), unit) : null,
+          doseLabel: amount ? (amount + " " + unit) : "",
+          volumeML: volumeML ? parseFloat(volumeML) : null,
+          site: site,
+          note: note,
+          peptideName: peptideName
+        });
+        addingAdhocDose = false;
+        saveStateDebounced();
+        renderContent();
+      });
+    }
+
     // print
     var printBtn = document.getElementById("print-btn");
     if (printBtn) {
-      printBtn.addEventListener("click", printLabel);
+      printBtn.addEventListener("click", function () {
+        if (labelSelection === "adhoc") {
+          printLabel();
+        } else if (labelSelection.indexOf("vial:") === 0) {
+          var vial = state.inventory.vials.filter(function (v) { return v.id === labelSelection.slice(5); })[0];
+          if (vial) printVialLabel(vial);
+        } else if (labelSelection.indexOf("batch:") === 0) {
+          var purchase = state.inventory.purchases.filter(function (p) { return p.id === labelSelection.slice(6); })[0];
+          if (purchase) printBatchLabel(purchase);
+        }
+      });
+    }
+    var labelSelectionSelect = document.getElementById("label-selection-select");
+    if (labelSelectionSelect) {
+      labelSelectionSelect.addEventListener("change", function () {
+        labelSelection = labelSelectionSelect.value;
+        renderContent();
+      });
     }
 
+    // ---- start wizard navigation ----
+    function goToWizardStep(n) {
+      wizardStep = n;
+      renderContent();
+    }
+
+    function gotoInventoryTab() {
+      currentTab = "inventory";
+      var allTabs = document.querySelectorAll(".tab");
+      allTabs.forEach(function (b) {
+        var active = b.getAttribute("data-tab") === "inventory";
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-selected", String(active));
+      });
+      renderContent();
+    }
+
+    var startReconstituteBtn = document.getElementById("start-reconstitute-btn");
+    if (startReconstituteBtn) {
+      startReconstituteBtn.addEventListener("click", function () {
+        var groups = inventorySummary(state.inventory).unopenedGroups;
+        var available = groups.filter(function (g) { return !findActiveVialMatch(g.peptideName); });
+        if (available.length === 0) { gotoInventoryTab(); return; }
+        wizardFlow = "reconstitute";
+        goToWizardStep(2);
+      });
+    }
+
+    var startPurchaseBtn = document.getElementById("start-purchase-btn");
+    if (startPurchaseBtn) {
+      startPurchaseBtn.addEventListener("click", function () {
+        wizardFlow = "purchase";
+        goToWizardStep(2);
+      });
+    }
+
+    var startViewInventoryBtn = document.getElementById("start-view-inventory-btn");
+    if (startViewInventoryBtn) startViewInventoryBtn.addEventListener("click", gotoInventoryTab);
+
+    var startAddDoseBtn = document.getElementById("start-add-dose-btn");
+    if (startAddDoseBtn) {
+      startAddDoseBtn.addEventListener("click", function () {
+        var actives = inventorySummary(state.inventory).activeVials;
+        if (actives.length === 0) return;
+        wizardFlow = "dose";
+        goToWizardStep(2);
+      });
+    }
+
+    var wizardBackToStartBtn = document.getElementById("wizard-back-to-start-btn");
+    if (wizardBackToStartBtn) wizardBackToStartBtn.addEventListener("click", function () { goToWizardStep(1); });
+
+    var vialPickerContinueBtn = document.getElementById("vial-picker-continue-btn");
+    if (vialPickerContinueBtn) {
+      vialPickerContinueBtn.addEventListener("click", function () {
+        var select = document.getElementById("dose-vial-select");
+        var idx = parseInt(select.value, 10);
+        var actives = inventorySummary(state.inventory).activeVials;
+        var v = actives[idx];
+        if (!v) return;
+        dosingVialId = v.id;
+        goToWizardStep(3);
+      });
+    }
+
+    var wizardBackToPickerBtn = document.getElementById("wizard-back-to-picker-btn");
+    if (wizardBackToPickerBtn) {
+      wizardBackToPickerBtn.addEventListener("click", function () { goToWizardStep(2); });
+    }
+
+    var wizardAddDoseConfirmBtn = document.getElementById("wizard-add-dose-confirm-btn");
+    if (wizardAddDoseConfirmBtn) {
+      wizardAddDoseConfirmBtn.addEventListener("click", function () {
+        var vial = state.inventory.vials.filter(function (v) { return v.id === dosingVialId; })[0];
+        if (!vial) return;
+        var amount = parseFloat(state.dose.amount) || 0;
+        if (amount <= 0) return;
+        vial.doseAmount = state.dose.amount;
+        vial.doseUnit = state.dose.unit;
+        vial.injections = vial.injections || [];
+        vial.injections.push({ id: uid(), date: todayISO(), doseAmount: state.dose.amount, doseUnit: state.dose.unit, site: "", note: "" });
+        saveStateDebounced();
+        printVialLabel(vial);
+        goToWizardStep(4);
+      });
+    }
+
+    var wizardViewTrackerBtn = document.getElementById("wizard-view-tracker-btn");
+    if (wizardViewTrackerBtn) {
+      wizardViewTrackerBtn.addEventListener("click", function () {
+        currentTab = "log";
+        var allTabs = document.querySelectorAll(".tab");
+        allTabs.forEach(function (b) {
+          var active = b.getAttribute("data-tab") === "log";
+          b.classList.toggle("active", active);
+          b.setAttribute("aria-selected", String(active));
+        });
+        renderContent();
+      });
+    }
+
+    var wizardAddAnotherDoseBtn = document.getElementById("wizard-add-another-dose-btn");
+    if (wizardAddAnotherDoseBtn) wizardAddAnotherDoseBtn.addEventListener("click", function () { goToWizardStep(3); });
+
+    var reconPickerContinueBtn = document.getElementById("recon-picker-continue-btn");
+    if (reconPickerContinueBtn) {
+      reconPickerContinueBtn.addEventListener("click", function () {
+        var select = document.getElementById("recon-batch-select");
+        var idx = parseInt(select.value, 10);
+        var groups = inventorySummary(state.inventory).unopenedGroups.filter(function (g) { return !findActiveVialMatch(g.peptideName); });
+        var g = groups[idx];
+        if (!g) return;
+        reconstitutingPeptide = g.peptideName;
+        reconstitutingPurchaseId = g.purchaseId || null;
+        goToWizardStep(3);
+      });
+    }
+
+    var wizardBackToReconPickerBtn = document.getElementById("wizard-back-to-recon-picker-btn");
+    if (wizardBackToReconPickerBtn) {
+      wizardBackToReconPickerBtn.addEventListener("click", function () { goToWizardStep(2); });
+    }
+
+    var wizardGotoInventoryBtn = document.getElementById("wizard-goto-inventory-btn");
+    if (wizardGotoInventoryBtn) wizardGotoInventoryBtn.addEventListener("click", gotoInventoryTab);
+
+    var wizardPrintVialLabelBtn = document.getElementById("wizard-print-vial-label-btn");
+    if (wizardPrintVialLabelBtn) {
+      wizardPrintVialLabelBtn.addEventListener("click", function () {
+        var vial = state.inventory.vials.filter(function (v) { return v.id === dosingVialId; })[0];
+        if (!vial) return;
+        printVialLabel(vial);
+        var box = document.getElementById("recon-label-prompt");
+        if (box) box.innerHTML = '<p class="field-hint">Label sent to print \u2014 saved to this vial\'s record, so you can reprint it anytime from Inventory.</p>';
+      });
+    }
+    var wizardSkipVialLabelBtn = document.getElementById("wizard-skip-vial-label-btn");
+    if (wizardSkipVialLabelBtn) {
+      wizardSkipVialLabelBtn.addEventListener("click", function () {
+        var box = document.getElementById("recon-label-prompt");
+        if (box) box.innerHTML = '<p class="field-hint">Skipped \u2014 you can print this vial\'s label anytime from Inventory.</p>';
+      });
+    }
+
+    var wizardPrintBatchLabelBtn = document.getElementById("wizard-print-batch-label-btn");
+    if (wizardPrintBatchLabelBtn) {
+      wizardPrintBatchLabelBtn.addEventListener("click", function () {
+        var purchases = state.inventory.purchases;
+        var last = purchases[purchases.length - 1];
+        if (!last) return;
+        printBatchLabel(last);
+        var box = document.getElementById("purchase-label-prompt");
+        if (box) box.innerHTML = '<p class="field-hint">Labels sent to print \u2014 saved to this batch\'s record, so you can reprint them anytime from Inventory.</p>';
+      });
+    }
+    var wizardSkipBatchLabelBtn = document.getElementById("wizard-skip-batch-label-btn");
+    if (wizardSkipBatchLabelBtn) {
+      wizardSkipBatchLabelBtn.addEventListener("click", function () {
+        var box = document.getElementById("purchase-label-prompt");
+        if (box) box.innerHTML = '<p class="field-hint">Skipped \u2014 you can print this batch\'s labels anytime from Inventory.</p>';
+      });
+    }
+
+    var wizardAddDoseNowBtn = document.getElementById("wizard-add-dose-now-btn");
+    if (wizardAddDoseNowBtn) {
+      wizardAddDoseNowBtn.addEventListener("click", function () {
+        wizardFlow = "dose";
+        // dosingVialId is already the vial we just reconstituted
+        goToWizardStep(3);
+      });
+    }
+
+    var wizardLogAnotherPurchaseBtn = document.getElementById("wizard-log-another-purchase-btn");
+    if (wizardLogAnotherPurchaseBtn) wizardLogAnotherPurchaseBtn.addEventListener("click", function () { goToWizardStep(2); });
+
     // ---- inventory: add purchase ----
+    // ---- inventory: collapsible section toggles ----
+    var togglePurchaseFormBtn = document.getElementById("toggle-purchase-form-btn");
+    if (togglePurchaseFormBtn) {
+      togglePurchaseFormBtn.addEventListener("click", function () {
+        purchaseFormOpen = !purchaseFormOpen;
+        renderContent();
+      });
+    }
+    var toggleStackFormBtn = document.getElementById("toggle-stack-form-btn");
+    if (toggleStackFormBtn) {
+      toggleStackFormBtn.addEventListener("click", function () {
+        stackSectionOpen = !stackSectionOpen;
+        renderContent();
+      });
+    }
+    var toggleVialDosesBtns = content.querySelectorAll(".toggle-vial-doses-btn");
+    toggleVialDosesBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-vial-id");
+        expandedVialDosesId = expandedVialDosesId === id ? null : id;
+        renderContent();
+      });
+    });
+
     var addPurchaseBtn = document.getElementById("add-purchase-btn");
     if (addPurchaseBtn) {
       addPurchaseBtn.addEventListener("click", function () {
         var peptideName = (document.getElementById("inv-peptideName").value || "").trim();
         var vialsPurchased = parseInt(document.getElementById("inv-vialsPurchased").value, 10);
         var strengthMg = parseFloat(document.getElementById("inv-strengthMg").value);
+        var vialSizeML = document.getElementById("inv-vialSizeML").value || "";
         var supplier = document.getElementById("inv-supplier").value || "";
         var purchaseDate = document.getElementById("inv-purchaseDate").value || todayISO();
         var lotNumber = document.getElementById("inv-lotNumber").value || "";
@@ -965,7 +2154,8 @@
         var purchaseId = uid();
         state.inventory.purchases.push({
           id: purchaseId, date: purchaseDate, peptideName: peptideName, supplier: supplier,
-          lotNumber: lotNumber, vialsPurchased: vialsPurchased, strengthMgEach: strengthMg, totalMg: totalMg
+          lotNumber: lotNumber, vialsPurchased: vialsPurchased, strengthMgEach: strengthMg,
+          vialSizeML: vialSizeML, totalMg: totalMg
         });
 
         for (var i = 0; i < vialsPurchased; i++) {
@@ -974,6 +2164,7 @@
             purchaseId: purchaseId,
             peptideName: peptideName,
             strengthMg: strengthMg,
+            vialSizeML: vialSizeML,
             status: "unopened",
             diluentML: "", reconstitutedDate: "", expiryDate: "", finishedDate: "",
             doseAmount: "", doseUnit: "mcg", plannedDoses: 8, injections: []
@@ -981,40 +2172,81 @@
         }
 
         saveStateDebounced();
-        renderContent();
+        if (currentTab === "start" && wizardFlow === "purchase") {
+          goToWizardStep(3);
+        } else {
+          purchaseFormOpen = false;
+          renderContent();
+        }
       });
     }
+    // ---- reconstitute form: discard-duration selector (computes the date, doesn't suggest a duration) ----
+    function updateReconExpiryPreview() {
+      var sel = document.getElementById("recon-expiry-duration");
+      var customInput = document.getElementById("recon-expiry-custom");
+      var preview = document.getElementById("recon-expiry-preview");
+      if (!sel) return;
+      if (sel.value === "custom") {
+        if (customInput) customInput.style.display = "";
+        if (preview) preview.textContent = "";
+      } else {
+        if (customInput) customInput.style.display = "none";
+        var reconDateEl = document.getElementById("recon-date");
+        var baseDate = (reconDateEl && reconDateEl.value) || todayISO();
+        var result = addDaysToDateStr(baseDate, parseInt(sel.value, 10));
+        if (preview) preview.textContent = "Discard by " + result;
+      }
+    }
+    var reconExpiryDurationSel = document.getElementById("recon-expiry-duration");
+    if (reconExpiryDurationSel) {
+      reconExpiryDurationSel.addEventListener("change", updateReconExpiryPreview);
+      updateReconExpiryPreview();
+    }
+    var reconDateInputForExpiry = document.getElementById("recon-date");
+    if (reconDateInputForExpiry) {
+      reconDateInputForExpiry.addEventListener("change", updateReconExpiryPreview);
+    }
 
-    // ---- inventory: toggle reconstitute form ----
-    var reconToggleBtns = content.querySelectorAll(".recon-toggle-btn");
-    reconToggleBtns.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var peptide = btn.getAttribute("data-peptide");
-        reconstitutingPeptide = reconstitutingPeptide === peptide ? null : peptide;
-        renderContent();
-      });
-    });
-
-    // ---- inventory: confirm reconstitution ----
     var confirmReconBtn = document.getElementById("confirm-recon-btn");
     if (confirmReconBtn) {
       confirmReconBtn.addEventListener("click", function () {
         var peptideName = confirmReconBtn.getAttribute("data-peptide");
+        var purchaseId = confirmReconBtn.getAttribute("data-purchase-id") || "";
         var diluentML = document.getElementById("recon-diluentML").value;
         var reconDate = document.getElementById("recon-date").value || todayISO();
-        var expiry = document.getElementById("recon-expiry").value || "";
+        var expiryDurationEl = document.getElementById("recon-expiry-duration");
+        var expiry = "";
+        if (expiryDurationEl && expiryDurationEl.value !== "custom") {
+          expiry = addDaysToDateStr(reconDate, parseInt(expiryDurationEl.value, 10));
+        } else {
+          var customExpiryEl = document.getElementById("recon-expiry-custom");
+          expiry = customExpiryEl ? customExpiryEl.value : "";
+        }
         var plannedDoses = parseInt(document.getElementById("recon-plannedDoses").value, 10) || 8;
         var doseAmount = document.getElementById("recon-doseAmount").value || "";
         var doseUnit = document.getElementById("recon-doseUnit").value || "mcg";
+        var frequency = document.getElementById("recon-frequency").value || "";
 
         if (!diluentML || parseFloat(diluentML) <= 0) {
           alert("Enter the diluent volume added to this vial.");
           return;
         }
 
-        var candidates = state.inventory.vials.filter(function (v) { return v.status === "unopened" && v.peptideName === peptideName; });
+        var alreadyActive = findActiveVialMatch(peptideName);
+        if (alreadyActive) {
+          alert("You already have an active " + peptideName + " vial (" + alreadyActive.id + "). Complete it before reconstituting another.");
+          reconstitutingPeptide = null;
+          reconstitutingPurchaseId = null;
+          wizardStep = 1;
+          renderContent();
+          return;
+        }
+
+        var candidates = state.inventory.vials.filter(function (v) {
+          return v.status === "unopened" && v.peptideName === peptideName && (purchaseId ? v.purchaseId === purchaseId : true);
+        });
         if (candidates.length === 0) return;
-        var vial = candidates[0]; // oldest / first unopened of this peptide
+        var vial = candidates[0]; // oldest / first unopened vial from this specific batch
         vial.status = "active";
         vial.diluentML = diluentML;
         vial.reconstitutedDate = reconDate;
@@ -1022,10 +2254,14 @@
         vial.plannedDoses = plannedDoses;
         vial.doseAmount = doseAmount;
         vial.doseUnit = doseUnit;
+        vial.frequency = frequency;
         vial.injections = [];
 
         reconstitutingPeptide = null;
+        reconstitutingPurchaseId = null;
+        dosingVialId = vial.id; // reuse for the Done screen's reference, regardless of flow
         saveStateDebounced();
+        wizardStep = 4;
         renderContent();
       });
     }
@@ -1038,18 +2274,14 @@
         var vial = state.inventory.vials.filter(function (v) { return v.id === id; })[0];
         if (!vial) return;
         vial.injections = vial.injections || [];
-        vial.injections.push({ id: uid(), date: todayISO() });
-        saveStateDebounced();
-        renderContent();
-      });
-    });
-    var undoInjBtns = content.querySelectorAll(".undo-injection-btn");
-    undoInjBtns.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-vial-id");
-        var vial = state.inventory.vials.filter(function (v) { return v.id === id; })[0];
-        if (!vial || !vial.injections || vial.injections.length === 0) return;
-        vial.injections.pop();
+        vial.injections.push({
+          id: uid(),
+          date: todayISO(),
+          doseAmount: vial.doseAmount || "",
+          doseUnit: vial.doseUnit || "mcg",
+          site: "",
+          note: ""
+        });
         saveStateDebounced();
         renderContent();
       });
@@ -1069,6 +2301,42 @@
       });
     });
 
+    // ---- inventory: edit an active vial's recorded reconstitution details ----
+    var editVialBtns = content.querySelectorAll(".edit-vial-btn");
+    editVialBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-vial-id");
+        editingVialId = editingVialId === id ? null : id;
+        renderContent();
+      });
+    });
+    var confirmEditVialBtn = document.getElementById("confirm-edit-vial-btn");
+    if (confirmEditVialBtn) {
+      confirmEditVialBtn.addEventListener("click", function () {
+        var id = confirmEditVialBtn.getAttribute("data-vial-id");
+        var vial = state.inventory.vials.filter(function (v) { return v.id === id; })[0];
+        if (!vial) return;
+        var diluentEl = document.getElementById("edit-diluentML");
+        var expiryEl = document.getElementById("edit-expiry");
+        var plannedEl = document.getElementById("edit-plannedDoses");
+        var doseAmountEl = document.getElementById("edit-doseAmount");
+        var doseUnitEl = document.getElementById("edit-doseUnit");
+        var frequencyEl = document.getElementById("edit-frequency");
+        if (diluentEl && diluentEl.value && parseFloat(diluentEl.value) > 0) vial.diluentML = diluentEl.value;
+        if (expiryEl) vial.expiryDate = expiryEl.value;
+        if (plannedEl && parseInt(plannedEl.value, 10) > 0) vial.plannedDoses = parseInt(plannedEl.value, 10);
+        if (doseAmountEl) vial.doseAmount = doseAmountEl.value;
+        if (doseUnitEl) vial.doseUnit = doseUnitEl.value;
+        if (frequencyEl) vial.frequency = frequencyEl.value;
+        editingVialId = null;
+        saveStateDebounced();
+        renderContent();
+      });
+    }
+
+    // ---- inventory match suggestion (Vial & mix tab / Start wizard step 2) ----
+    // handled via delegated listener in attachGlobalHandlers, since this box re-renders on every keystroke
+
     // ---- inventory: print a single vial's label ----
     var printVialBtns = content.querySelectorAll(".print-vial-btn");
     printVialBtns.forEach(function (btn) {
@@ -1084,6 +2352,98 @@
     if (printReportBtn) {
       printReportBtn.addEventListener("click", printInventoryReport);
     }
+
+    // ---- inventory: reprint a batch label ----
+    var printBatchLabelBtns = content.querySelectorAll(".print-batch-label-btn");
+    printBatchLabelBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var purchaseId = btn.getAttribute("data-purchase-id");
+        var purchase = state.inventory.purchases.filter(function (p) { return p.id === purchaseId; })[0];
+        if (purchase) printBatchLabel(purchase);
+      });
+    });
+
+    // ---- inventory: stack an injection across multiple active vials ----
+    var logStackBtn = document.getElementById("log-stack-btn");
+    if (logStackBtn) {
+      logStackBtn.addEventListener("click", function () {
+        var checks = content.querySelectorAll(".stack-check");
+        var components = [];
+        var totalVolumeML = 0;
+        var invalid = false;
+
+        checks.forEach(function (cb) {
+          if (!cb.checked) return;
+          var vialId = cb.getAttribute("data-vial-id");
+          var vial = state.inventory.vials.filter(function (v) { return v.id === vialId; })[0];
+          if (!vial) return;
+          var amountEl = content.querySelector('.stack-amount[data-vial-id="' + vialId + '"]');
+          var unitEl = content.querySelector('.stack-unit[data-vial-id="' + vialId + '"]');
+          var amount = parseFloat(amountEl ? amountEl.value : "") || 0;
+          var unit = unitEl ? unitEl.value : "mcg";
+          if (amount <= 0) { invalid = true; return; }
+          var conc = vialConcentration(vial);
+          var conv = doseToVolume(amount, unit, conc);
+          components.push({ vialId: vialId, peptideName: vial.peptideName, doseAmount: amount, doseUnit: unit, volumeML: conv.volumeML });
+          totalVolumeML += conv.volumeML;
+        });
+
+        if (components.length === 0) {
+          alert(invalid ? "Enter a dose amount for each vial you checked." : "Check at least one active vial to include in the stack.");
+          return;
+        }
+
+        var syringeSel = document.getElementById("stack-syringe");
+        var syringe = SYRINGES.filter(function (sy) { return sy.id === (syringeSel ? syringeSel.value : "u100"); })[0] || SYRINGES[2];
+        var overCapacity = totalVolumeML > syringe.capML;
+
+        var dtVal = (document.getElementById("stack-datetime") || {}).value;
+        var date, time;
+        if (dtVal) {
+          var parts = dtVal.split("T");
+          date = parts[0];
+          time = parts[1] || "";
+        } else {
+          date = todayISO();
+          time = "";
+        }
+
+        var stackId = uid();
+        state.stacks.unshift({
+          id: stackId,
+          date: date,
+          time: time,
+          site: (document.getElementById("stack-site") || {}).value || "",
+          notes: (document.getElementById("stack-notes") || {}).value || "",
+          components: components,
+          totalVolumeML: totalVolumeML,
+          totalUnits: totalVolumeML * 100,
+          syringeId: syringe.id,
+          overCapacity: overCapacity
+        });
+
+        components.forEach(function (c) {
+          var vial = state.inventory.vials.filter(function (v) { return v.id === c.vialId; })[0];
+          if (!vial) return;
+          vial.injections = vial.injections || [];
+          vial.injections.push({ id: uid(), date: date, stackId: stackId, doseAmount: c.doseAmount, doseUnit: c.doseUnit, site: "", note: "" });
+        });
+
+        saveStateDebounced();
+        stackSectionOpen = false;
+        renderContent();
+      });
+    }
+
+    var deleteStackBtns = content.querySelectorAll(".delete-stack-btn");
+    deleteStackBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-stack-id");
+        state.stacks = state.stacks.filter(function (x) { return x.id !== id; });
+        saveStateDebounced();
+        renderContent();
+      });
+    });
 
     // ---- saved calculations ----
     var saveCalcBtn = document.getElementById("save-calc-btn");
@@ -1148,7 +2508,7 @@
     var conv = doseToVolume(doseAmountNum, v.doseUnit, conc);
     var doneCount = (v.injections || []).length;
     var doseLine = doseAmountNum > 0
-      ? '<div class="label-row mono">Dose: ' + esc(v.doseAmount) + ' ' + esc(v.doseUnit) + ' → ' + fmt(conv.volumeML * 100, 1) + 'U</div>'
+      ? '<div class="label-row mono">Dose: ' + esc(v.doseAmount) + ' ' + esc(v.doseUnit) + (v.frequency ? ' \u00b7 ' + esc(v.frequency) : '') + ' \u2192 ' + fmt(conv.volumeML * 100, 1) + 'U</div>'
       : "";
     return '' +
       '<div class="label-card">' +
@@ -1163,10 +2523,40 @@
   }
 
   function printVialLabel(vial) {
+    vial.labelPrinted = true;
+    vial.labelPrintedDate = todayISO();
+    saveStateDebounced();
     var size = LABEL_SIZES[state.label.size] || LABEL_SIZES.small;
     var copies = state.label.copies || 1;
     var cells = "";
     for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell">' + vialLabelCardHTML(vial) + '</div>';
+    var root = document.getElementById("print-root");
+    root.style.setProperty("--label-w", size.wIn + "in");
+    root.style.setProperty("--label-h", size.hIn + "in");
+    root.innerHTML = '<div class="print-sheet">' + cells + '</div>';
+    window.print();
+  }
+
+  function batchLabelCardHTML(p) {
+    return '' +
+      '<div class="label-card">' +
+      '<div class="label-name">RXpep \u00b7 ' + esc(p.peptideName) + '</div>' +
+      '<div class="label-row mono">UNOPENED \u00b7 ' + fmt(p.strengthMgEach, 2) + ' mg' + (p.vialSizeML ? ' / ' + esc(p.vialSizeML) + ' mL vial' : '') + '</div>' +
+      (p.supplier ? '<div class="label-row">' + esc(p.supplier) + '</div>' : '') +
+      (p.lotNumber ? '<div class="label-row">Lot ' + esc(p.lotNumber) + '</div>' : '') +
+      '<div class="label-row">Purchased ' + esc(p.date || "—") + '</div>' +
+      '<div class="label-footer">Store per pharmacist instructions. Not yet reconstituted.</div>' +
+      '</div>';
+  }
+
+  function printBatchLabel(purchase) {
+    purchase.labelPrinted = true;
+    purchase.labelPrintedDate = todayISO();
+    saveStateDebounced();
+    var size = LABEL_SIZES[state.label.size] || LABEL_SIZES.small;
+    var copies = purchase.vialsPurchased || 1; // one label per physical vial in this batch, by default
+    var cells = "";
+    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell">' + batchLabelCardHTML(purchase) + '</div>';
     var root = document.getElementById("print-root");
     root.style.setProperty("--label-w", size.wIn + "in");
     root.style.setProperty("--label-h", size.hIn + "in");
@@ -1181,8 +2571,9 @@
 
     var purchasesRows = inv.purchases.map(function (p) {
       return '<tr><td>' + esc(p.date) + '</td><td>' + esc(p.peptideName) + '</td><td>' + esc(p.supplier || "—") + '</td>' +
-        '<td>' + p.vialsPurchased + '</td><td>' + fmt(p.strengthMgEach, 2) + ' mg</td><td>' + fmt(p.totalMg, 2) + ' mg</td>' +
-        '<td>' + esc(p.lotNumber || "—") + '</td></tr>';
+        '<td>' + p.vialsPurchased + '</td><td>' + fmt(p.strengthMgEach, 2) + ' mg</td>' +
+        '<td>' + (p.vialSizeML ? fmt(p.vialSizeML, 2) + ' mL' : "—") + '</td>' +
+        '<td>' + fmt(p.totalMg, 2) + ' mg</td><td>' + esc(p.lotNumber || "—") + '</td></tr>';
     }).join("");
 
     var vialsRows = inv.vials.slice().reverse().map(function (v) {
@@ -1197,14 +2588,16 @@
       '<p class="report-meta">Generated ' + todayISO() + '</p>' +
       '<div class="report-summary-grid">' +
       '<div><span>Total purchased</span><strong>' + fmt(s.totalPurchasedMg, 2) + ' mg</strong></div>' +
+      '<div><span>Raw (unopened)</span><strong>' + fmt(s.rawMg, 2) + ' mg</strong></div>' +
+      '<div><span>Reconstituted (active)</span><strong>' + fmt(s.reconstitutedMg, 2) + ' mg</strong></div>' +
       '<div><span>Remaining (est.)</span><strong>' + fmt(s.remainingMg, 2) + ' mg</strong></div>' +
       '<div><span>Unopened</span><strong>' + s.unopenedCount + '</strong></div>' +
       '<div><span>Active</span><strong>' + s.activeCount + '</strong></div>' +
       '<div><span>Finished</span><strong>' + s.finishedCount + '</strong></div>' +
       '</div>' +
       '<h2>Purchases</h2>' +
-      '<table class="report-table"><thead><tr><th>Date</th><th>Peptide</th><th>Supplier</th><th>Vials</th><th>Strength</th><th>Total</th><th>Lot</th></tr></thead><tbody>' +
-      (purchasesRows || '<tr><td colspan="7">No purchases logged.</td></tr>') + '</tbody></table>' +
+      '<table class="report-table"><thead><tr><th>Date</th><th>Peptide</th><th>Supplier</th><th>Vials</th><th>Strength</th><th>Vial size</th><th>Total</th><th>Lot</th></tr></thead><tbody>' +
+      (purchasesRows || '<tr><td colspan="8">No purchases logged.</td></tr>') + '</tbody></table>' +
       '<h2>Vial history</h2>' +
       '<table class="report-table"><thead><tr><th>Vial ID</th><th>Peptide</th><th>Status</th><th>Opened</th><th>Expiry</th><th>Finished</th><th>Injections</th></tr></thead><tbody>' +
       (vialsRows || '<tr><td colspan="7">No vials yet.</td></tr>') + '</tbody></table>' +

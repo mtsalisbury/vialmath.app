@@ -1,6 +1,6 @@
 {
-  "name": "RXpep Calculator",
-  "short_name": "RXpep",
+  "name": "VialMath",
+  "short_name": "VialMath",
   "description": "Reconstitution and dose tracking calculator",
   "start_url": "./index.html",
   "scope": "./",
