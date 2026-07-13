@@ -136,6 +136,10 @@
 
   .text-btn { background: none; border: none; color: var(--primary); font-size: 12.5px; cursor: pointer; padding: 4px 6px; font-family: 'Inter', sans-serif; font-weight: 500; }
   .text-btn.subtle { color: var(--muted); }
+  .reference-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .reference-list li { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #fff; }
+  .reference-list a { color: var(--primary); font-weight: 500; font-size: 14px; text-decoration: none; }
+  .reference-list a:hover { text-decoration: underline; }
 
   .contact-reminder { margin-top: 18px; border: 1px solid var(--warn); color: var(--warn); border-radius: 8px; padding: 12px 14px; font-size: 12.5px; line-height: 1.5; }
 
@@ -287,6 +291,10 @@
     { id: "u100", label: "1 mL insulin (100-unit)", capML: 1.0, isUnit: true, minReadML: 0.01 },
     { id: "ml1", label: "1 mL standard (mL scale)", capML: 1.0, isUnit: false, minReadML: 0.01 },
     { id: "ml3", label: "3 mL standard (mL scale)", capML: 3.0, isUnit: false, minReadML: 0.1 }
+  ];
+
+  var REFERENCE_LINKS = [
+    { label: "Peptide reconstitution calculator \u2014 peptidesexplorer.com", url: "https://peptidesexplorer.com/tools/peptide-reconstitution-calculator" }
   ];
 
   var LABEL_SIZES = {
@@ -1583,13 +1591,16 @@
   }
 
   function renderReferenceTab() {
+    var items = REFERENCE_LINKS.length === 0
+      ? '<li class="field-hint">No links added yet</li>'
+      : REFERENCE_LINKS.map(function (l) {
+          return '<li><a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a></li>';
+        }).join("");
     return '' +
       '<section class="card">' +
       '<h2>Reference</h2>' +
-      '<p class="card-desc">A place to keep links you find useful \u2014 pharmacist/prescriber contact info, storage guidance, official product inserts, whatever\'s relevant to you. This is just a placeholder for now; tell me what you\'d like here and I\'ll fill it in.</p>' +
-      '<ul class="reference-list">' +
-      '<li class="field-hint">No links added yet</li>' +
-      '</ul>' +
+      '<p class="card-desc">Links you\'ve asked to keep handy \u2014 pharmacist/prescriber contact info, storage guidance, official product inserts, other tools, whatever\'s relevant. Tell me anytime and I\'ll add more.</p>' +
+      '<ul class="reference-list">' + items + '</ul>' +
       '</section>';
   }
 
