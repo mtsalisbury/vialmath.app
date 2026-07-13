@@ -243,6 +243,14 @@
     .print-label-cell .label-row.mono { font-size: 7pt; }
     .print-label-cell .label-footer { font-size: 5.5pt; }
 
+    /* 3 mL vial wrap (40x20mm) is much smaller than the other presets — tighten everything and drop the footer disclaimer, there's no room */
+    .print-label-cell.label-tiny { padding: 0.03in 0.06in; }
+    .print-label-cell.label-tiny .label-card { gap: 0; }
+    .print-label-cell.label-tiny .label-name { font-size: 6.5pt; line-height: 1.15; }
+    .print-label-cell.label-tiny .label-row { font-size: 5pt; line-height: 1.2; }
+    .print-label-cell.label-tiny .label-row.mono { font-size: 4.8pt; }
+    .print-label-cell.label-tiny .label-footer { display: none; }
+
     .report-page { font-family: 'Inter', sans-serif; color: #17262A; padding: 0; }
     .report-title { font-family: 'Fraunces', serif; font-size: 20pt; margin: 0 0 2pt; }
     .report-meta { font-size: 9pt; color: #5C6F6A; margin: 0 0 14pt; }
@@ -277,6 +285,7 @@
   ];
 
   var LABEL_SIZES = {
+    vial3ml: { name: "3 mL vial wrap — 1.5\" × 0.75\" (40 × 20 mm)", wIn: 1.5, hIn: 0.75 },
     small: { name: "Small — 2.5\" × 1.25\" (vial wrap)", wIn: 2.5, hIn: 1.25 },
     medium: { name: "Medium — 3\" × 2\" (jar/box)", wIn: 3, hIn: 2 },
     large: { name: "Large — 4\" × 3\" (info card)", wIn: 4, hIn: 3 }
@@ -287,7 +296,7 @@
     dose: { amount: "", unit: "mcg", syringeId: "u100", linkedVialId: "" },
     meta: { reconstitutedDate: "", discardDate: "", prescriberNotes: "" },
     log: [],
-    label: { size: "small", copies: 6 },
+    label: { size: "vial3ml", copies: 6 },
     inventory: { purchases: [], vials: [], counters: {} },
     saved: [],
     stacks: []
@@ -517,6 +526,8 @@
   var expandedVialDosesId = null; // which vial's dose history is expanded on the Inventory page (UI-only, not persisted)
   var purchaseFormOpen = false; // Inventory: is the "Log a purchase" section expanded (UI-only, not persisted)
   var stackSectionOpen = false; // Inventory: is the "Stack an injection" section expanded (UI-only, not persisted)
+  var logDoseFormOpen = false; // Inventory: is the "Log a dose" section expanded (UI-only, not persisted)
+  var reconstituteFormOpen = false; // Inventory: is the "Reconstitute" section expanded (UI-only, not persisted)
   var labelSelection = "adhoc"; // Print label tab: "adhoc" | "vial:<id>" | "batch:<purchaseId>" (UI-only, not persisted)
 
   function loadState() {
@@ -869,6 +880,57 @@
       '<button class="primary-btn" id="wizard-add-dose-confirm-btn" ' + (hasAmount ? "" : "disabled") + '>Print label &amp; log dose</button>' +
       '</div>' +
       '</section>';
+  }
+
+  function reconstituteSectionHTML(unopenedGroups) {
+    var available = unopenedGroups.filter(function (g) { return !findActiveVialMatch(g.peptideName); });
+    if (available.length === 0) {
+      return '<div class="notice">Nothing available to reconstitute \u2014 log a purchase above, or complete an active vial to free up its peptide.</div>';
+    }
+    var currentValid = available.some(function (g) { return g.peptideName === reconstitutingPeptide && (g.purchaseId || "") === (reconstitutingPurchaseId || ""); });
+    if (!currentValid) {
+      reconstitutingPeptide = available[0].peptideName;
+      reconstitutingPurchaseId = available[0].purchaseId || null;
+    }
+    var options = available.map(function (g) {
+      var subBits = [g.count + ' unopened', fmt(g.strengthMg, 2) + ' mg each'];
+      if (g.vialSizeML) subBits.push(g.vialSizeML + ' mL vial');
+      if (g.supplier) subBits.push(g.supplier);
+      if (g.lotNumber) subBits.push('lot ' + g.lotNumber);
+      var val = g.peptideName + "::" + (g.purchaseId || "");
+      var isSelected = g.peptideName === reconstitutingPeptide && (g.purchaseId || "") === (reconstitutingPurchaseId || "");
+      return '<option value="' + esc(val) + '"' + (isSelected ? " selected" : "") + '>' + esc(g.peptideName + " \u2014 " + subBits.join(", ")) + '</option>';
+    }).join("");
+    var chosen = available.filter(function (g) { return g.peptideName === reconstitutingPeptide && (g.purchaseId || "") === (reconstitutingPurchaseId || ""); })[0] || available[0];
+
+    return '' +
+      field("Which batch?", null, '<select id="inv-recon-batch-select">' + options + '</select>') +
+      reconstituteFormHTML(chosen);
+  }
+
+  function logDoseFormHTML(activeVials) {
+    var ds = state.dose;
+    if (activeVials.length === 0) {
+      return '<div class="notice">No active vials yet. Reconstitute one first.</div>';
+    }
+    var linkOptions = activeVials.map(function (v) { return opt(v.id, ds.linkedVialId, v.peptideName + ' (' + v.id + ')'); }).join("");
+    var vial = state.inventory.vials.filter(function (v) { return v.id === ds.linkedVialId && v.status === "active"; })[0];
+    var conc = vial ? vialConcentration(vial) : 0;
+    var amount = parseFloat(ds.amount) || 0;
+    var conv = doseToVolume(amount, ds.unit, conc);
+    var hasAmount = amount > 0 && !!vial;
+    return '' +
+      field("Vial", null, '<select data-path="dose.linkedVialId">' + linkOptions + '</select>') +
+      '<div class="grid-2">' +
+      field("Dose amount", null,
+        '<div class="input-row"><input type="number" min="0" inputmode="decimal" data-path="dose.amount" value="' + esc(ds.amount) + '" placeholder="e.g. 250" />' +
+        '<select data-path="dose.unit">' + opt("mcg", ds.unit) + opt("mg", ds.unit) + opt("units", ds.unit, "units (syringe)") + '</select></div>') +
+      '<div></div>' +
+      '</div>' +
+      '<div class="result-panel ' + (hasAmount ? "" : "muted") + '" id="inv-dose-result-panel">' +
+      (hasAmount ? renderWizardDoseResult(conv, true) : '<div class="result-label">Draw to</div><div class="result-value">\u2014</div>') +
+      '</div>' +
+      '<button class="primary-btn" id="confirm-inv-dose-btn" ' + (hasAmount ? "" : "disabled") + '>Log this dose</button>';
   }
 
   function renderWizardDoseResult(conv, hasAmount) {
@@ -1295,6 +1357,22 @@
         : "") +
       '</div>';
 
+    var reconstituteSection = '' +
+      '<div class="collapsible-fn">' +
+      '<button type="button" class="collapsible-fn-toggle" id="toggle-reconstitute-form-btn">' +
+      (reconstituteFormOpen ? "\u25be" : "\u25b8") + ' Reconstitute' +
+      '</button>' +
+      (reconstituteFormOpen ? reconstituteSectionHTML(s.unopenedGroups) : "") +
+      '</div>';
+
+    var logDoseSection = '' +
+      '<div class="collapsible-fn">' +
+      '<button type="button" class="collapsible-fn-toggle" id="toggle-log-dose-form-btn">' +
+      (logDoseFormOpen ? "\u25be" : "\u25b8") + ' Log a dose' +
+      '</button>' +
+      (logDoseFormOpen ? logDoseFormHTML(s.activeVials) : "") +
+      '</div>';
+
     var unopenedHTML = s.unopenedGroups.length === 0 ? "" : s.unopenedGroups.map(function (g) {
       var existingActive = findActiveVialMatch(g.peptideName);
       var blocked = !!existingActive;
@@ -1306,7 +1384,7 @@
         (lowStock ? ' <span class="reorder-flag">Reorder soon</span>' : '') + '</div>' +
         (blocked
           ? '<span class="field-hint">Active: <span class="mono vial-id">' + esc(existingActive.id) + '</span>' + (isVialExpired(existingActive) ? ' <span class="reorder-flag expired-flag">Expired</span>' : '') + '</span>'
-          : '<span class="field-hint">Ready to reconstitute</span>') +
+          : '<button type="button" class="text-btn goto-reconstitute-link" data-peptide="' + esc(g.peptideName) + '" data-purchase-id="' + esc(g.purchaseId || "") + '">Ready to reconstitute \u2192</button>') +
         '</div>' +
         (g.purchaseId ? '<div class="field-hint">' + (g.labelPrinted ? "Label printed " + esc(g.labelPrintedDate) : "Label not printed yet") + ' \u00b7 <button class="text-btn print-batch-label-btn" data-purchase-id="' + esc(g.purchaseId) + '">' + (g.labelPrinted ? "Reprint" : "Print") + ' batch label</button></div>' : "") +
         '</div>';
@@ -1330,6 +1408,8 @@
       '<h2>Inventory</h2>' +
       '<p class="card-desc">What\'s in stock, what\'s open, and what\'s been done with it.</p>' +
       purchaseSection +
+      reconstituteSection +
+      logDoseSection +
       stackSection +
       '<h3 class="section-h">Unopened (in stock)</h3>' +
       (unopenedHTML || '<div class="notice">Nothing unopened right now.</div>') +
@@ -1655,6 +1735,19 @@
       if (wizardDoseResultPanel) { wizardDoseResultPanel.className = "result-panel " + (wHasAmount ? "" : "muted"); wizardDoseResultPanel.innerHTML = renderWizardDoseResult(wConv, wHasAmount); }
       var wizardAddDoseConfirmBtn = document.getElementById("wizard-add-dose-confirm-btn");
       if (wizardAddDoseConfirmBtn) wizardAddDoseConfirmBtn.disabled = !wHasAmount;
+    }
+
+    var invDoseVial = state.inventory.vials.filter(function (v) { return v.id === state.dose.linkedVialId && v.status === "active"; })[0];
+    var invDoseResultPanel = document.getElementById("inv-dose-result-panel");
+    if (invDoseResultPanel) {
+      var iConc = invDoseVial ? vialConcentration(invDoseVial) : 0;
+      var iAmount = parseFloat(state.dose.amount) || 0;
+      var iConv = doseToVolume(iAmount, state.dose.unit, iConc);
+      var iHasAmount = iAmount > 0 && !!invDoseVial;
+      invDoseResultPanel.className = "result-panel " + (iHasAmount ? "" : "muted");
+      invDoseResultPanel.innerHTML = iHasAmount ? renderWizardDoseResult(iConv, true) : '<div class="result-label">Draw to</div><div class="result-value">\u2014</div>';
+      var confirmInvDoseBtnLive = document.getElementById("confirm-inv-dose-btn");
+      if (confirmInvDoseBtnLive) confirmInvDoseBtnLive.disabled = !iHasAmount;
     }
   }
 
@@ -2125,6 +2218,44 @@
         renderContent();
       });
     }
+    var toggleLogDoseFormBtn = document.getElementById("toggle-log-dose-form-btn");
+    if (toggleLogDoseFormBtn) {
+      toggleLogDoseFormBtn.addEventListener("click", function () {
+        logDoseFormOpen = !logDoseFormOpen;
+        renderContent();
+      });
+    }
+    var toggleReconstituteFormBtn = document.getElementById("toggle-reconstitute-form-btn");
+    if (toggleReconstituteFormBtn) {
+      toggleReconstituteFormBtn.addEventListener("click", function () {
+        reconstituteFormOpen = !reconstituteFormOpen;
+        renderContent();
+      });
+    }
+    var invReconBatchSelect = document.getElementById("inv-recon-batch-select");
+    if (invReconBatchSelect) {
+      invReconBatchSelect.addEventListener("change", function () {
+        var parts = invReconBatchSelect.value.split("::");
+        reconstitutingPeptide = parts[0];
+        reconstitutingPurchaseId = parts[1] || null;
+        renderContent();
+      });
+    }
+    var confirmInvDoseBtn = document.getElementById("confirm-inv-dose-btn");
+    if (confirmInvDoseBtn) {
+      confirmInvDoseBtn.addEventListener("click", function () {
+        var vial = state.inventory.vials.filter(function (v) { return v.id === state.dose.linkedVialId && v.status === "active"; })[0];
+        var amount = parseFloat(state.dose.amount) || 0;
+        if (!vial || amount <= 0) return;
+        vial.doseAmount = state.dose.amount;
+        vial.doseUnit = state.dose.unit;
+        vial.injections = vial.injections || [];
+        vial.injections.push({ id: uid(), date: todayISO(), doseAmount: state.dose.amount, doseUnit: state.dose.unit, site: "", note: "" });
+        saveStateDebounced();
+        logDoseFormOpen = false;
+        renderContent();
+      });
+    }
     var toggleVialDosesBtns = content.querySelectorAll(".toggle-vial-doses-btn");
     toggleVialDosesBtns.forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -2261,7 +2392,11 @@
         reconstitutingPurchaseId = null;
         dosingVialId = vial.id; // reuse for the Done screen's reference, regardless of flow
         saveStateDebounced();
-        wizardStep = 4;
+        if (currentTab === "start" && wizardFlow === "reconstitute") {
+          wizardStep = 4;
+        } else {
+          reconstituteFormOpen = false;
+        }
         renderContent();
       });
     }
@@ -2360,6 +2495,16 @@
         var purchaseId = btn.getAttribute("data-purchase-id");
         var purchase = state.inventory.purchases.filter(function (p) { return p.id === purchaseId; })[0];
         if (purchase) printBatchLabel(purchase);
+      });
+    });
+
+    var gotoReconstituteLinks = content.querySelectorAll(".goto-reconstitute-link");
+    gotoReconstituteLinks.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        reconstitutingPeptide = btn.getAttribute("data-peptide");
+        reconstitutingPurchaseId = btn.getAttribute("data-purchase-id") || null;
+        reconstituteFormOpen = true;
+        renderContent();
       });
     });
 
@@ -2529,7 +2674,8 @@
     var size = LABEL_SIZES[state.label.size] || LABEL_SIZES.small;
     var copies = state.label.copies || 1;
     var cells = "";
-    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell">' + vialLabelCardHTML(vial) + '</div>';
+    var tinyClass = state.label.size === "vial3ml" ? " label-tiny" : "";
+    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell' + tinyClass + '">' + vialLabelCardHTML(vial) + '</div>';
     var root = document.getElementById("print-root");
     root.style.setProperty("--label-w", size.wIn + "in");
     root.style.setProperty("--label-h", size.hIn + "in");
@@ -2556,7 +2702,8 @@
     var size = LABEL_SIZES[state.label.size] || LABEL_SIZES.small;
     var copies = purchase.vialsPurchased || 1; // one label per physical vial in this batch, by default
     var cells = "";
-    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell">' + batchLabelCardHTML(purchase) + '</div>';
+    var tinyClass = state.label.size === "vial3ml" ? " label-tiny" : "";
+    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell' + tinyClass + '">' + batchLabelCardHTML(purchase) + '</div>';
     var root = document.getElementById("print-root");
     root.style.setProperty("--label-w", size.wIn + "in");
     root.style.setProperty("--label-h", size.hIn + "in");
@@ -2611,7 +2758,8 @@
     var size = LABEL_SIZES[state.label.size] || LABEL_SIZES.small;
     var copies = state.label.copies || 1;
     var cells = "";
-    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell">' + labelCardHTML(d) + '</div>';
+    var tinyClass = state.label.size === "vial3ml" ? " label-tiny" : "";
+    for (var i = 0; i < copies; i++) cells += '<div class="print-label-cell' + tinyClass + '">' + labelCardHTML(d) + '</div>';
     var root = document.getElementById("print-root");
     root.style.setProperty("--label-w", size.wIn + "in");
     root.style.setProperty("--label-h", size.hIn + "in");
